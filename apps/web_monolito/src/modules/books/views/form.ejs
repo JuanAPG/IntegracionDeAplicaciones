@@ -1,0 +1,217 @@
+<%
+  var selectedAuthorIds = book.authors.map(function (a) { return a.id; });
+  var selectedGenreIds = book.genres.map(function (g) { return g.id; });
+  var usedConceptIds = book.concepts.map(function (c) { return c.concept_id; });
+%>
+<div class="page-head">
+  <div>
+    <h1><%= book.id ? 'Editar libro' : 'Nuevo libro' %></h1>
+    <p class="lead">Datos del libro y sus relaciones multivaluadas: autores, generos, conceptos e imagenes.</p>
+  </div>
+  <div class="actions">
+    <% if (book.id) { %><a class="btn btn-secondary" href="/catalog/<%= book.id %>">Ver en catalogo</a><% } %>
+    <a class="btn btn-secondary" href="/admin/books">Volver</a>
+  </div>
+</div>
+
+<div class="card">
+  <form action="<%= book.id ? '/admin/books/' + book.id : '/admin/books' %>" method="POST">
+    <fieldset>
+      <legend>Datos del libro (FD: ISBN &rarr; titulo, ano, precio, stock, formato, categoria)</legend>
+      <div class="form-row">
+        <div class="field">
+          <label for="isbn">ISBN</label>
+          <input type="text" id="isbn" name="isbn" value="<%= book.isbn %>" required maxlength="20">
+        </div>
+        <div class="field">
+          <label for="title">Titulo</label>
+          <input type="text" id="title" name="title" value="<%= book.title %>" required maxlength="255">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label for="publication_year">Ano de publicacion</label>
+          <input type="number" id="publication_year" name="publication_year" value="<%= book.publication_year %>" required min="1" max="<%= new Date().getFullYear() + 1 %>">
+        </div>
+        <div class="field">
+          <label for="price">Precio</label>
+          <input type="number" id="price" name="price" value="<%= book.price %>" required min="0" step="0.01">
+        </div>
+        <div class="field">
+          <label for="stock">Stock</label>
+          <input type="number" id="stock" name="stock" value="<%= book.stock %>" required min="0" step="1">
+        </div>
+        <div class="field">
+          <label for="format_id">Formato</label>
+          <select id="format_id" name="format_id" required>
+            <option value="">Seleccione...</option>
+            <% formatList.forEach(function (f) { %>
+              <option value="<%= f.id %>" <%= book.format_id === f.id ? 'selected' : '' %>><%= f.name %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="category_id">Categoria</label>
+          <select id="category_id" name="category_id" required>
+            <option value="">Seleccione...</option>
+            <% categoryList.forEach(function (c) { %>
+              <option value="<%= c.id %>" <%= book.category_id === c.id ? 'selected' : '' %>><%= c.name %></option>
+            <% }); %>
+          </select>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="grid grid-2">
+      <fieldset>
+        <legend>Autores (libro &rarr;&rarr; autor)</legend>
+        <div class="field">
+          <label for="author_ids">Autores registrados</label>
+          <select id="author_ids" name="author_ids" multiple size="8">
+            <% authorList.forEach(function (a) { %>
+              <option value="<%= a.id %>" <%= selectedAuthorIds.indexOf(a.id) !== -1 ? 'selected' : '' %>><%= a.name %></option>
+            <% }); %>
+          </select>
+          <p class="hint">Ctrl / Cmd + clic para seleccionar varios.</p>
+        </div>
+        <div class="field">
+          <label for="new_authors">Agregar autores nuevos</label>
+          <input type="text" id="new_authors" name="new_authors" placeholder="Ana Ruiz, Luis Perez">
+          <p class="hint">Separe por comas; se crean en el catalogo de autores si no existen.</p>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Generos (libro &rarr;&rarr; genero)</legend>
+        <div class="field">
+          <label for="genre_ids">Generos registrados</label>
+          <select id="genre_ids" name="genre_ids" multiple size="8">
+            <% genreList.forEach(function (g) { %>
+              <option value="<%= g.id %>" <%= selectedGenreIds.indexOf(g.id) !== -1 ? 'selected' : '' %>><%= g.name %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="new_genres">Agregar generos nuevos</label>
+          <input type="text" id="new_genres" name="new_genres" placeholder="Ciencia ficcion, Ensayo">
+          <p class="hint">Separe por comas; se crean en el catalogo de generos si no existen.</p>
+        </div>
+      </fieldset>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit"><%= book.id ? 'Guardar cambios' : 'Crear libro' %></button>
+      <a class="btn btn-secondary" href="/admin/books">Cancelar</a>
+      <% if (!book.id) { %><span class="hint">Las imagenes y los conceptos se agregan despues de crear el libro.</span><% } %>
+    </div>
+  </form>
+</div>
+
+<% if (book.id) { %>
+  <div class="card">
+    <h2>Conceptos definidos en este libro</h2>
+    <p class="lead">(libro, concepto) &rarr; definicion. Un mismo concepto puede definirse distinto en otro libro.</p>
+
+    <% if (!book.concepts.length) { %>
+      <p class="empty">Este libro aun no define conceptos.</p>
+    <% } %>
+    <% book.concepts.forEach(function (c) { %>
+      <form action="/admin/books/<%= book.id %>/concepts/<%= c.concept_id %>" method="POST" class="concept">
+        <div class="concept-name">
+          <a href="/admin/concepts/<%= c.concept_id %>"><%= c.name %></a>
+        </div>
+        <div class="field">
+          <label for="definition_<%= c.concept_id %>">Definicion en este libro</label>
+          <textarea id="definition_<%= c.concept_id %>" name="definition" required><%= c.definition %></textarea>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary btn-sm" type="submit">Actualizar definicion</button>
+        </div>
+      </form>
+      <form action="/admin/books/<%= book.id %>/concepts/<%= c.concept_id %>/delete" method="POST"
+            style="margin:-10px 0 18px 12px"
+            onsubmit="return confirm('Quitar el concepto &quot;<%= c.name %>&quot; de este libro?');">
+        <button class="btn btn-danger btn-sm" type="submit">Quitar concepto</button>
+      </form>
+    <% }); %>
+
+    <fieldset>
+      <legend>Agregar concepto al libro</legend>
+      <form action="/admin/books/<%= book.id %>/concepts" method="POST">
+        <div class="form-row">
+          <div class="field">
+            <label for="concept_id">Concepto existente</label>
+            <select id="concept_id" name="concept_id">
+              <option value="">-- ninguno --</option>
+              <% conceptList.forEach(function (c) { %>
+                <option value="<%= c.id %>" <%= usedConceptIds.indexOf(c.id) !== -1 ? 'disabled' : '' %>><%= c.name %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="field">
+            <label for="new_concept">o concepto nuevo</label>
+            <input type="text" id="new_concept" name="new_concept" maxlength="150" placeholder="Normalizacion">
+          </div>
+        </div>
+        <div class="field">
+          <label for="definition">Definicion segun este libro</label>
+          <textarea id="definition" name="definition" required placeholder="Escriba la definicion tal como la presenta este libro..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Agregar concepto</button>
+        </div>
+      </form>
+    </fieldset>
+  </div>
+
+  <div class="card">
+    <h2>Imagenes del libro</h2>
+    <p class="lead">Un libro puede tener varias imagenes; solo una puede ser la portada.</p>
+
+    <form action="/admin/books/<%= book.id %>/images" method="POST" enctype="multipart/form-data">
+      <div class="form-row">
+        <div class="field">
+          <label for="image">Archivo de imagen</label>
+          <input type="file" id="image" name="image" accept="image/png,image/jpeg,image/webp,image/gif" required>
+          <p class="hint">JPG, PNG, WEBP o GIF.</p>
+        </div>
+        <div class="field">
+          <label for="is_cover">Portada</label>
+          <label class="hint">
+            <input type="checkbox" id="is_cover" name="is_cover" style="width:auto">
+            Usar esta imagen como portada
+          </label>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Cargar imagen</button>
+      </div>
+    </form>
+
+    <% if (book.images.length) { %>
+      <div class="image-admin" style="margin-top:18px">
+        <% book.images.forEach(function (img) { %>
+          <figure>
+            <img src="<%= img.url %>" alt="Imagen de <%= book.title %>">
+            <figcaption>
+              <% if (img.is_cover) { %><span class="badge badge-stock-ok">Portada</span><% } %>
+              <div class="actions">
+                <% if (!img.is_cover) { %>
+                  <form action="/admin/books/<%= book.id %>/images/<%= img.id %>/cover" method="POST" class="inline">
+                    <button class="btn btn-secondary btn-sm" type="submit">Hacer portada</button>
+                  </form>
+                <% } %>
+                <form action="/admin/books/<%= book.id %>/images/<%= img.id %>/delete" method="POST" class="inline"
+                      onsubmit="return confirm('Eliminar esta imagen?');">
+                  <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
+                </form>
+              </div>
+            </figcaption>
+          </figure>
+        <% }); %>
+      </div>
+    <% } else { %>
+      <p class="empty">Sin imagenes cargadas.</p>
+    <% } %>
+  </div>
+<% } %>

@@ -1,0 +1,87 @@
+<div class="page-head">
+  <div>
+    <h1><%= book.title %></h1>
+    <p class="lead">
+      <% if (book.authors.length) { %>
+        Por <%= book.authors.map(function (a) { return a.name; }).join(', ') %>
+      <% } else { %>Sin autores registrados<% } %>
+    </p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-secondary" href="/catalog">Volver al catalogo</a>
+    <% if (isAdmin) { %><a class="btn btn-primary" href="/admin/books/<%= book.id %>/edit">Editar</a><% } %>
+  </div>
+</div>
+
+<div class="detail-grid">
+  <div>
+    <div class="card">
+      <% if (cover) { %>
+        <img class="detail-cover" src="<%= cover.url %>" alt="Portada de <%= book.title %>">
+      <% } else { %>
+        <div class="book-cover-placeholder" style="border-radius:10px">Sin portada</div>
+      <% } %>
+
+      <% if (book.images.length > 1) { %>
+        <div class="gallery">
+          <% book.images.forEach(function (img) { %>
+            <img src="<%= img.url %>" alt="Imagen de <%= book.title %>">
+          <% }); %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>Ficha del libro</h2>
+      <dl class="meta">
+        <dt>ISBN</dt><dd><%= book.isbn %></dd>
+        <dt>Ano de publicacion</dt><dd><%= book.publication_year %></dd>
+        <dt>Precio</dt><dd class="price">$<%= Number(book.price).toFixed(2) %></dd>
+        <dt>Stock</dt>
+        <dd>
+          <% if (book.stock > 0) { %>
+            <span class="badge badge-stock-ok"><%= book.stock %> disponibles</span>
+          <% } else { %>
+            <span class="badge badge-stock-out">Agotado</span>
+          <% } %>
+        </dd>
+        <dt>Formato</dt><dd><%= book.format_name %></dd>
+        <dt>Categoria</dt><dd><%= book.category_name %></dd>
+        <dt>Generos</dt>
+        <dd>
+          <div class="badges">
+            <% if (!book.genres.length) { %><span class="hint">Sin generos</span><% } %>
+            <% book.genres.forEach(function (g) { %>
+              <a class="badge" href="/catalog?genre=<%= g.id %>"><%= g.name %></a>
+            <% }); %>
+          </div>
+        </dd>
+        <dt>Autores</dt>
+        <dd>
+          <div class="badges">
+            <% if (!book.authors.length) { %><span class="hint">Sin autores</span><% } %>
+            <% book.authors.forEach(function (a) { %>
+              <a class="badge" href="/catalog?author=<%= a.id %>"><%= a.name %></a>
+            <% }); %>
+          </div>
+        </dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h2>Conceptos definidos en este libro</h2>
+      <p class="lead">Cada definicion pertenece al par (libro, concepto): otro libro puede definir el mismo concepto de forma distinta.</p>
+      <% if (!book.concepts.length) { %>
+        <p class="empty">Este libro no tiene conceptos definidos.</p>
+      <% } %>
+      <% book.concepts.forEach(function (c) { %>
+        <div class="concept">
+          <div class="concept-name"><%= c.name %></div>
+          <div><%= c.definition %></div>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</div>

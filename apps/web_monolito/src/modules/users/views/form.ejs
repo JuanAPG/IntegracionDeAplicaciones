@@ -1,0 +1,81 @@
+<div class="page-head">
+  <div>
+    <h1><%= title %></h1>
+    <p class="lead">FD: usuario_id &rarr; nombre, correo, contrasena, rol.</p>
+  </div>
+  <a class="btn btn-secondary" href="/admin/users">Volver</a>
+</div>
+
+<div class="card">
+  <form action="<%= user.id ? '/admin/users/' + user.id : '/admin/users' %>" method="POST">
+    <div class="form-row">
+      <div class="field">
+        <label for="full_name">Nombre completo</label>
+        <input type="text" id="full_name" name="full_name" value="<%= user.full_name %>" required maxlength="150">
+      </div>
+      <div class="field">
+        <label for="email">Correo electronico</label>
+        <input type="email" id="email" name="email" value="<%= user.email %>" required maxlength="150">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label for="role">Rol</label>
+        <select id="role" name="role">
+          <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>user</option>
+          <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %> <%= adminExists && user.role !== 'admin' ? 'disabled' : '' %>>admin</option>
+        </select>
+        <% if (adminExists && user.role !== 'admin') { %>
+          <p class="hint">Ya existe un administrador; la base de datos impide registrar otro.</p>
+        <% } %>
+      </div>
+      <div class="field">
+        <label for="is_active">Estado</label>
+        <label class="hint">
+          <input type="checkbox" id="is_active" name="is_active" style="width:auto" <%= user.is_active ? 'checked' : '' %>>
+          Cuenta activa (puede iniciar sesion)
+        </label>
+      </div>
+    </div>
+
+    <% if (!user.id) { %>
+      <div class="form-row">
+        <div class="field">
+          <label for="password">Contrasena</label>
+          <input type="password" id="password" name="password" required minlength="6">
+        </div>
+        <div class="field">
+          <label for="password_confirmation">Confirmar contrasena</label>
+          <input type="password" id="password_confirmation" name="password_confirmation" required minlength="6">
+        </div>
+      </div>
+    <% } %>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit"><%= user.id ? 'Guardar cambios' : 'Crear usuario' %></button>
+      <a class="btn btn-secondary" href="/admin/users">Cancelar</a>
+    </div>
+  </form>
+</div>
+
+<% if (user.id) { %>
+  <div class="card">
+    <h2>Restablecer contrasena</h2>
+    <form action="/admin/users/<%= user.id %>/password" method="POST">
+      <div class="form-row">
+        <div class="field">
+          <label for="new_password">Nueva contrasena</label>
+          <input type="password" id="new_password" name="password" required minlength="6">
+        </div>
+        <div class="field">
+          <label for="new_password_confirmation">Confirmar contrasena</label>
+          <input type="password" id="new_password_confirmation" name="password_confirmation" required minlength="6">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-danger" type="submit">Restablecer</button>
+      </div>
+    </form>
+  </div>
+<% } %>

@@ -1,0 +1,74 @@
+<div class="page-head">
+  <div>
+    <h1>Usuarios</h1>
+    <p class="lead">Usuarios registrados (<%= total %>). El sistema admite como maximo un administrador.</p>
+  </div>
+  <a class="btn btn-primary" href="/admin/users/new">+ Nuevo usuario</a>
+</div>
+
+<div class="card">
+  <form action="/admin/users" method="GET" class="filters">
+    <div class="field">
+      <label for="q">Buscar</label>
+      <input type="search" id="q" name="q" value="<%= search %>" placeholder="Nombre o correo...">
+    </div>
+    <div class="field">
+      <label for="role">Rol</label>
+      <select id="role" name="role">
+        <option value="">Todos</option>
+        <option value="admin" <%= role === 'admin' ? 'selected' : '' %>>admin</option>
+        <option value="user" <%= role === 'user' ? 'selected' : '' %>>user</option>
+      </select>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">Filtrar</button>
+      <a class="btn btn-secondary" href="/admin/users">Limpiar</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="num">ID</th>
+          <th>Nombre</th>
+          <th>Correo</th>
+          <th>Rol</th>
+          <th>Estado</th>
+          <th>Alta</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!items.length) { %><tr><td colspan="7" class="empty">Sin usuarios.</td></tr><% } %>
+        <% items.forEach(function (u) { %>
+          <tr>
+            <td class="num"><%= u.id %></td>
+            <td><%= u.full_name %></td>
+            <td><%= u.email %></td>
+            <td><span class="role-tag <%= u.role %>"><%= u.role %></span></td>
+            <td>
+              <% if (u.is_active) { %><span class="badge badge-stock-ok">activo</span>
+              <% } else { %><span class="badge badge-stock-out">inactivo</span><% } %>
+            </td>
+            <td><%= new Date(u.created_at).toLocaleDateString('es-MX') %></td>
+            <td>
+              <div class="actions">
+                <a class="btn btn-secondary btn-sm" href="/admin/users/<%= u.id %>/edit">Editar</a>
+                <% if (u.role !== 'admin' && u.id !== currentUser.id) { %>
+                  <form action="/admin/users/<%= u.id %>/delete" method="POST" class="inline"
+                        onsubmit="return confirm('Eliminar al usuario <%= u.full_name %>?');">
+                    <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
+                  </form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+  <%- include('../../../views/partials/pagination') %>
+</div>

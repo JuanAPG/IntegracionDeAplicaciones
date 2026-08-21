@@ -1,0 +1,43 @@
+<div class="page-head">
+  <div>
+    <h1>Panel de administracion</h1>
+    <p class="lead">Resumen del modelo normalizado almacenado en PostgreSQL.</p>
+  </div>
+  <a class="btn btn-primary" href="/admin/books/new">+ Nuevo libro</a>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="value"><%= stats.books %></div><div class="label">Libros</div></div>
+  <div class="stat"><div class="value"><%= stats.authors %></div><div class="label">Autores</div></div>
+  <div class="stat"><div class="value"><%= stats.genres %></div><div class="label">Generos</div></div>
+  <div class="stat"><div class="value"><%= stats.concepts %></div><div class="label">Conceptos</div></div>
+  <div class="stat"><div class="value"><%= stats.images %></div><div class="label">Imagenes</div></div>
+  <div class="stat"><div class="value"><%= stats.formats %></div><div class="label">Formatos</div></div>
+  <div class="stat"><div class="value"><%= stats.categories %></div><div class="label">Categorias</div></div>
+  <div class="stat"><div class="value"><%= stats.users %></div><div class="label">Usuarios</div></div>
+  <div class="stat"><div class="value"><%= stats.stock %></div><div class="label">Unidades en stock</div></div>
+</div>
+
+<div class="card" style="margin-top:20px">
+  <h2>Modulos disponibles</h2>
+  <div class="grid grid-2">
+    <div>
+      <h3>Contenido</h3>
+      <ul>
+        <li><a href="/admin/books">Libros</a> &mdash; CRUD completo con autores, generos, conceptos e imagenes.</li>
+        <li><a href="/admin/authors">Autores</a> &mdash; libro &rarr;&rarr; autor (book_authors).</li>
+        <li><a href="/admin/genres">Generos</a> &mdash; libro &rarr;&rarr; genero (book_genres).</li>
+        <li><a href="/admin/concepts">Conceptos</a> &mdash; (libro, concepto) &rarr; definicion (book_concepts).</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Catalogos y acceso</h3>
+      <ul>
+        <li><a href="/admin/formats">Formatos</a> &mdash; catalogo independiente.</li>
+        <li><a href="/admin/categories">Categorias</a> &mdash; catalogo independiente.</li>
+        <li><a href="/admin/users">Usuarios</a> &mdash; maximo un administrador.</li>
+        <li><a href="/catalog">Catalogo publico</a> &mdash; vista de los usuarios registrados.</li>
+      </ul>
+    </div>
+  </div>
+</div>

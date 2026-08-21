@@ -1,0 +1,25 @@
+<div class="page-head">
+  <div>
+    <h1>Concepto: <%= concept.name %></h1>
+    <p class="lead">Definiciones registradas en cada libro (dependencia (libro, concepto) &rarr; definicion).</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-secondary" href="<%= meta.basePath %>/<%= concept.id %>/edit">Editar concepto</a>
+    <a class="btn btn-secondary" href="<%= meta.basePath %>">Volver</a>
+  </div>
+</div>
+
+<div class="card">
+  <% if (!definitions.length) { %>
+    <p class="empty">Este concepto todavia no tiene definiciones asociadas a ningun libro.</p>
+  <% } %>
+  <% definitions.forEach(function (d) { %>
+    <div class="concept">
+      <div class="concept-name">
+        <a href="/admin/books/<%= d.book_id %>/edit"><%= d.title %></a>
+        <span class="badge">ISBN <%= d.isbn %></span>
+      </div>
+      <div><%= d.definition %></div>
+    </div>
+  <% }); %>
+</div>

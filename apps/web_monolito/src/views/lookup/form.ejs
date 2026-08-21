@@ -1,0 +1,15 @@
+<div class="card card-form">
+  <h1><%= title %></h1>
+  <p class="lead"><%= meta.description %></p>
+  <form action="<%= item.id ? meta.basePath + '/' + item.id : meta.basePath %>" method="POST">
+    <div class="field">
+      <label for="name"><%= meta.nameLabel %></label>
+      <input type="text" id="name" name="name" value="<%= item.name %>" required maxlength="<%= meta.maxLength || 150 %>" autofocus>
+      <p class="hint">Debe ser unico dentro del catalogo.</p>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit"><%= item.id ? 'Guardar cambios' : 'Crear' %></button>
+      <a class="btn btn-secondary" href="<%= meta.basePath %>">Cancelar</a>
+    </div>
+  </form>
+</div>

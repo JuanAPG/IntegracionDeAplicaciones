@@ -1,0 +1,63 @@
+<div class="page-head">
+  <div>
+    <h1><%= meta.title %></h1>
+    <p class="lead"><%= meta.description %> (<%= total %> registro<%= total === 1 ? '' : 's' %>)</p>
+  </div>
+  <a class="btn btn-primary" href="<%= meta.basePath %>/new">+ Nuevo <%= meta.singular %></a>
+</div>
+
+<div class="card">
+  <form action="<%= meta.basePath %>" method="GET" class="filters">
+    <div class="field">
+      <label for="q">Buscar</label>
+      <input type="search" id="q" name="q" value="<%= search %>" placeholder="Nombre...">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">Filtrar</button>
+      <a class="btn btn-secondary" href="<%= meta.basePath %>">Limpiar</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="num">ID</th>
+          <th><%= meta.nameLabel %></th>
+          <th class="num"><%= meta.usageLabel %></th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!items.length) { %>
+          <tr><td colspan="4" class="empty">Sin registros.</td></tr>
+        <% } %>
+        <% items.forEach(function (item) { %>
+          <tr>
+            <td class="num"><%= item.id %></td>
+            <td>
+              <% if (meta.detailPath) { %>
+                <a href="<%= meta.basePath %>/<%= item.id %>"><%= item.name %></a>
+              <% } else { %>
+                <%= item.name %>
+              <% } %>
+            </td>
+            <td class="num"><%= item.books_count %></td>
+            <td>
+              <div class="actions">
+                <a class="btn btn-secondary btn-sm" href="<%= meta.basePath %>/<%= item.id %>/edit">Editar</a>
+                <form action="<%= meta.basePath %>/<%= item.id %>/delete" method="POST" class="inline"
+                      onsubmit="return confirm('Eliminar <%= meta.singular %> &quot;<%= item.name %>&quot;?');">
+                  <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+  <%- include('../partials/pagination') %>
+</div>

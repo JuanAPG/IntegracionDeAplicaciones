@@ -1,0 +1,30 @@
+<header class="navbar">
+  <div class="container navbar-inner">
+    <a class="brand" href="/">&#128218; <%= appName %></a>
+    <nav class="nav-links">
+      <a href="/catalog" class="<%= currentPath.startsWith('/catalog') ? 'active' : '' %>">Catalogo</a>
+      <% if (isAdmin) { %>
+        <a href="/admin/books" class="<%= currentPath.startsWith('/admin/books') ? 'active' : '' %>">Libros</a>
+        <a href="/admin/authors" class="<%= currentPath.startsWith('/admin/authors') ? 'active' : '' %>">Autores</a>
+        <a href="/admin/genres" class="<%= currentPath.startsWith('/admin/genres') ? 'active' : '' %>">Generos</a>
+        <a href="/admin/concepts" class="<%= currentPath.startsWith('/admin/concepts') ? 'active' : '' %>">Conceptos</a>
+        <a href="/admin/formats" class="<%= currentPath.startsWith('/admin/formats') ? 'active' : '' %>">Formatos</a>
+        <a href="/admin/categories" class="<%= currentPath.startsWith('/admin/categories') ? 'active' : '' %>">Categorias</a>
+        <a href="/admin/users" class="<%= currentPath.startsWith('/admin/users') ? 'active' : '' %>">Usuarios</a>
+      <% } %>
+    </nav>
+    <div class="nav-session">
+      <% if (currentUser) { %>
+        <a href="/auth/profile" class="user-chip">
+          <%= currentUser.full_name %><span class="role-tag <%= currentUser.role %>"><%= currentUser.role %></span>
+        </a>
+        <form action="/auth/logout" method="POST" class="inline">
+          <button type="submit" class="btn btn-ghost btn-sm">Salir</button>
+        </form>
+      <% } else { %>
+        <a href="/auth/login" class="btn btn-ghost btn-sm">Iniciar sesion</a>
+        <a href="/auth/register" class="btn btn-primary btn-sm">Registrarse</a>
+      <% } %>
+    </div>
+  </div>
+</header>

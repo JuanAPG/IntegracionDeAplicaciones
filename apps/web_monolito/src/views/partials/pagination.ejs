@@ -1,0 +1,8 @@
+<% if (pagination && pagination.totalPages > 1) { %>
+  <nav class="pagination">
+    <% for (var p = 1; p <= pagination.totalPages; p++) { %>
+      <a class="page <%= p === pagination.page ? 'current' : '' %>"
+         href="<%= pagination.baseUrl %><%= pagination.baseUrl.indexOf('?') === -1 ? '?' : '&' %>page=<%= p %>"><%= p %></a>
+    <% } %>
+  </nav>
+<% } %>
