@@ -2,3 +2,6 @@ node_modules/
 .env
 src/public/uploads/*
 !src/public/uploads/.gitkeep
+
+# Vista previa local de la interfaz (generada, no forma parte de la app)
+src/public/__preview__/

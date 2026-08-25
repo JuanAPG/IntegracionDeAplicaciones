@@ -1,6 +1,10 @@
-<section class="card card-centered">
-  <h1 class="error-code"><%= status %></h1>
+<section class="card card-centered" style="max-width:620px">
+  <p class="error-code"><%= status %></p>
+  <h1>Algo no salio como esperabamos</h1>
   <p class="lead"><%= message %></p>
-  <% if (detail) { %><pre class="error-detail"><%= detail %></pre><% } %>
-  <a class="btn btn-primary" href="/">Volver al inicio</a>
+  <% if (detail) { %><pre class="error-detail mt-4"><%= detail %></pre><% } %>
+  <div class="form-actions">
+    <a class="btn btn-primary" href="/">Volver al inicio</a>
+    <a class="btn btn-secondary" href="/catalog">Ir al catalogo</a>
+  </div>
 </section>

@@ -3,15 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#070B16">
+  <meta name="description" content="Libreria en linea: catalogo de libros con autores, generos, formatos, imagenes y conceptos definidos por cada titulo.">
   <title><%= typeof title !== 'undefined' ? title : appName %> | <%= appName %></title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%237C3AED'/><path d='M9 8h8a4 4 0 0 1 4 4v12H13a4 4 0 0 1-4-4V8Z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/><path d='M21 12h2v12h-6' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/></svg>">
 </head>
 <body>
+  <a class="skip-link" href="#contenido">Saltar al contenido principal</a>
+
   <%- include('partials/navbar') %>
-  <main class="container">
+
+  <main class="container" id="contenido">
     <%- include('partials/messages') %>
     <%- body %>
   </main>
+
   <%- include('partials/footer') %>
+
+  <script src="/js/ui.js" defer></script>
+  <% if (typeof hasSpline !== 'undefined' && hasSpline) { %>
+    <script src="/js/spotlight.js" defer></script>
+    <script src="/js/spline-hero.js" type="module"></script>
+  <% } %>
 </body>
 </html>

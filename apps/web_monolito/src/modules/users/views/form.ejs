@@ -1,9 +1,13 @@
 <div class="page-head">
   <div>
+    <p class="eyebrow">Usuarios</p>
     <h1><%= title %></h1>
     <p class="lead">FD: usuario_id &rarr; nombre, correo, contrasena, rol.</p>
   </div>
-  <a class="btn btn-secondary" href="/admin/users">Volver</a>
+  <a class="btn btn-secondary" href="/admin/users">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Volver
+  </a>
 </div>
 
 <div class="card">
@@ -11,29 +15,29 @@
     <div class="form-row">
       <div class="field">
         <label for="full_name">Nombre completo</label>
-        <input type="text" id="full_name" name="full_name" value="<%= user.full_name %>" required maxlength="150">
+        <input type="text" id="full_name" name="full_name" value="<%= user.full_name %>" required maxlength="150" autocomplete="name">
       </div>
       <div class="field">
         <label for="email">Correo electronico</label>
-        <input type="email" id="email" name="email" value="<%= user.email %>" required maxlength="150">
+        <input type="email" id="email" name="email" value="<%= user.email %>" required maxlength="150" autocomplete="email">
       </div>
     </div>
 
     <div class="form-row">
       <div class="field">
         <label for="role">Rol</label>
-        <select id="role" name="role">
+        <select id="role" name="role" <%= adminExists && user.role !== 'admin' ? 'aria-describedby="role-hint"' : '' %>>
           <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>user</option>
           <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %> <%= adminExists && user.role !== 'admin' ? 'disabled' : '' %>>admin</option>
         </select>
         <% if (adminExists && user.role !== 'admin') { %>
-          <p class="hint">Ya existe un administrador; la base de datos impide registrar otro.</p>
+          <p class="hint" id="role-hint">Ya existe un administrador; la base de datos impide registrar otro.</p>
         <% } %>
       </div>
       <div class="field">
         <label for="is_active">Estado</label>
-        <label class="hint">
-          <input type="checkbox" id="is_active" name="is_active" style="width:auto" <%= user.is_active ? 'checked' : '' %>>
+        <label class="check" for="is_active">
+          <input type="checkbox" id="is_active" name="is_active" <%= user.is_active ? 'checked' : '' %>>
           Cuenta activa (puede iniciar sesion)
         </label>
       </div>
@@ -43,11 +47,11 @@
       <div class="form-row">
         <div class="field">
           <label for="password">Contrasena</label>
-          <input type="password" id="password" name="password" required minlength="6">
+          <input type="password" id="password" name="password" required minlength="6" autocomplete="new-password">
         </div>
         <div class="field">
           <label for="password_confirmation">Confirmar contrasena</label>
-          <input type="password" id="password_confirmation" name="password_confirmation" required minlength="6">
+          <input type="password" id="password_confirmation" name="password_confirmation" required minlength="6" autocomplete="new-password">
         </div>
       </div>
     <% } %>
@@ -62,15 +66,16 @@
 <% if (user.id) { %>
   <div class="card">
     <h2>Restablecer contrasena</h2>
-    <form action="/admin/users/<%= user.id %>/password" method="POST">
+    <p class="lead">La contrasena actual se sustituye sin necesidad de conocerla.</p>
+    <form action="/admin/users/<%= user.id %>/password" method="POST" class="mt-4">
       <div class="form-row">
         <div class="field">
           <label for="new_password">Nueva contrasena</label>
-          <input type="password" id="new_password" name="password" required minlength="6">
+          <input type="password" id="new_password" name="password" required minlength="6" autocomplete="new-password">
         </div>
         <div class="field">
           <label for="new_password_confirmation">Confirmar contrasena</label>
-          <input type="password" id="new_password_confirmation" name="password_confirmation" required minlength="6">
+          <input type="password" id="new_password_confirmation" name="password_confirmation" required minlength="6" autocomplete="new-password">
         </div>
       </div>
       <div class="form-actions">

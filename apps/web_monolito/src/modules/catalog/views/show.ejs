@@ -1,5 +1,6 @@
 <div class="page-head">
   <div>
+    <p class="eyebrow">Ficha bibliografica</p>
     <h1><%= book.title %></h1>
     <p class="lead">
       <% if (book.authors.length) { %>
@@ -8,7 +9,10 @@
     </p>
   </div>
   <div class="actions">
-    <a class="btn btn-secondary" href="/catalog">Volver al catalogo</a>
+    <a class="btn btn-secondary" href="/catalog">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Volver al catalogo
+    </a>
     <% if (isAdmin) { %><a class="btn btn-primary" href="/admin/books/<%= book.id %>/edit">Editar</a><% } %>
   </div>
 </div>
@@ -19,13 +23,16 @@
       <% if (cover) { %>
         <img class="detail-cover" src="<%= cover.url %>" alt="Portada de <%= book.title %>">
       <% } else { %>
-        <div class="book-cover-placeholder" style="border-radius:10px">Sin portada</div>
+        <div class="book-cover-placeholder" style="border-radius:var(--r-md)">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+          Sin portada
+        </div>
       <% } %>
 
       <% if (book.images.length > 1) { %>
         <div class="gallery">
           <% book.images.forEach(function (img) { %>
-            <img src="<%= img.url %>" alt="Imagen de <%= book.title %>">
+            <img src="<%= img.url %>" alt="Imagen adicional de <%= book.title %>" loading="lazy" decoding="async">
           <% }); %>
         </div>
       <% } %>
@@ -36,9 +43,9 @@
     <div class="card">
       <h2>Ficha del libro</h2>
       <dl class="meta">
-        <dt>ISBN</dt><dd><%= book.isbn %></dd>
-        <dt>Ano de publicacion</dt><dd><%= book.publication_year %></dd>
-        <dt>Precio</dt><dd class="price">$<%= Number(book.price).toFixed(2) %></dd>
+        <dt>ISBN</dt><dd class="mono"><%= book.isbn %></dd>
+        <dt>Ano</dt><dd><%= book.publication_year %></dd>
+        <dt>Precio</dt><dd><span class="price">$<%= Number(book.price).toFixed(2) %></span></dd>
         <dt>Stock</dt>
         <dd>
           <% if (book.stock > 0) { %>
@@ -47,8 +54,8 @@
             <span class="badge badge-stock-out">Agotado</span>
           <% } %>
         </dd>
-        <dt>Formato</dt><dd><%= book.format_name %></dd>
-        <dt>Categoria</dt><dd><%= book.category_name %></dd>
+        <dt>Formato</dt><dd><span class="badge"><%= book.format_name %></span></dd>
+        <dt>Categoria</dt><dd><span class="badge"><%= book.category_name %></span></dd>
         <dt>Generos</dt>
         <dd>
           <div class="badges">
@@ -72,16 +79,21 @@
 
     <div class="card">
       <h2>Conceptos definidos en este libro</h2>
-      <p class="lead">Cada definicion pertenece al par (libro, concepto): otro libro puede definir el mismo concepto de forma distinta.</p>
-      <% if (!book.concepts.length) { %>
-        <p class="empty">Este libro no tiene conceptos definidos.</p>
-      <% } %>
-      <% book.concepts.forEach(function (c) { %>
-        <div class="concept">
-          <div class="concept-name"><%= c.name %></div>
-          <div><%= c.definition %></div>
-        </div>
-      <% }); %>
+      <p class="lead">
+        Cada definicion pertenece al par (libro, concepto): otro libro puede
+        definir el mismo concepto de forma distinta.
+      </p>
+      <div class="mt-4">
+        <% if (!book.concepts.length) { %>
+          <p class="empty">Este libro no tiene conceptos definidos.</p>
+        <% } %>
+        <% book.concepts.forEach(function (c) { %>
+          <div class="concept" data-reveal>
+            <p class="concept-name"><%= c.name %></p>
+            <p class="concept-def"><%= c.definition %></p>
+          </div>
+        <% }); %>
+      </div>
     </div>
   </div>
 </div>

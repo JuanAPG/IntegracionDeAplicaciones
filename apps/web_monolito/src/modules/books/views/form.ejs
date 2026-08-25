@@ -5,23 +5,28 @@
 %>
 <div class="page-head">
   <div>
+    <p class="eyebrow">Libros</p>
     <h1><%= book.id ? 'Editar libro' : 'Nuevo libro' %></h1>
     <p class="lead">Datos del libro y sus relaciones multivaluadas: autores, generos, conceptos e imagenes.</p>
   </div>
   <div class="actions">
     <% if (book.id) { %><a class="btn btn-secondary" href="/catalog/<%= book.id %>">Ver en catalogo</a><% } %>
-    <a class="btn btn-secondary" href="/admin/books">Volver</a>
+    <a class="btn btn-secondary" href="/admin/books">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Volver
+    </a>
   </div>
 </div>
 
 <div class="card">
   <form action="<%= book.id ? '/admin/books/' + book.id : '/admin/books' %>" method="POST">
     <fieldset>
-      <legend>Datos del libro (FD: ISBN &rarr; titulo, ano, precio, stock, formato, categoria)</legend>
+      <legend>Datos del libro</legend>
+      <p class="hint" style="margin:0 0 var(--space-4)">FD: ISBN &rarr; titulo, ano, precio, stock, formato, categoria.</p>
       <div class="form-row">
         <div class="field">
           <label for="isbn">ISBN</label>
-          <input type="text" id="isbn" name="isbn" value="<%= book.isbn %>" required maxlength="20">
+          <input type="text" id="isbn" name="isbn" value="<%= book.isbn %>" required maxlength="20" placeholder="978-84-0000-000-0">
         </div>
         <div class="field">
           <label for="title">Titulo</label>
@@ -64,25 +69,27 @@
 
     <div class="grid grid-2">
       <fieldset>
-        <legend>Autores (libro &rarr;&rarr; autor)</legend>
+        <legend>Autores</legend>
+        <p class="hint" style="margin:0 0 var(--space-4)">Relacion multivaluada libro &rarr;&rarr; autor.</p>
         <div class="field">
           <label for="author_ids">Autores registrados</label>
-          <select id="author_ids" name="author_ids" multiple size="8">
+          <select id="author_ids" name="author_ids" multiple size="8" aria-describedby="authors-hint">
             <% authorList.forEach(function (a) { %>
               <option value="<%= a.id %>" <%= selectedAuthorIds.indexOf(a.id) !== -1 ? 'selected' : '' %>><%= a.name %></option>
             <% }); %>
           </select>
-          <p class="hint">Ctrl / Cmd + clic para seleccionar varios.</p>
+          <p class="hint" id="authors-hint">Ctrl / Cmd + clic para seleccionar varios.</p>
         </div>
         <div class="field">
           <label for="new_authors">Agregar autores nuevos</label>
-          <input type="text" id="new_authors" name="new_authors" placeholder="Ana Ruiz, Luis Perez">
-          <p class="hint">Separe por comas; se crean en el catalogo de autores si no existen.</p>
+          <input type="text" id="new_authors" name="new_authors" placeholder="Ana Ruiz, Luis Perez" aria-describedby="new-authors-hint">
+          <p class="hint" id="new-authors-hint">Separe por comas; se crean en el catalogo de autores si no existen.</p>
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Generos (libro &rarr;&rarr; genero)</legend>
+        <legend>Generos</legend>
+        <p class="hint" style="margin:0 0 var(--space-4)">Relacion multivaluada libro &rarr;&rarr; genero.</p>
         <div class="field">
           <label for="genre_ids">Generos registrados</label>
           <select id="genre_ids" name="genre_ids" multiple size="8">
@@ -93,8 +100,8 @@
         </div>
         <div class="field">
           <label for="new_genres">Agregar generos nuevos</label>
-          <input type="text" id="new_genres" name="new_genres" placeholder="Ciencia ficcion, Ensayo">
-          <p class="hint">Separe por comas; se crean en el catalogo de generos si no existen.</p>
+          <input type="text" id="new_genres" name="new_genres" placeholder="Ciencia ficcion, Ensayo" aria-describedby="new-genres-hint">
+          <p class="hint" id="new-genres-hint">Separe por comas; se crean en el catalogo de generos si no existen.</p>
         </div>
       </fieldset>
     </div>
@@ -102,7 +109,9 @@
     <div class="form-actions">
       <button class="btn btn-primary" type="submit"><%= book.id ? 'Guardar cambios' : 'Crear libro' %></button>
       <a class="btn btn-secondary" href="/admin/books">Cancelar</a>
-      <% if (!book.id) { %><span class="hint">Las imagenes y los conceptos se agregan despues de crear el libro.</span><% } %>
+      <% if (!book.id) { %>
+        <span class="hint">Las imagenes y los conceptos se agregan despues de crear el libro.</span>
+      <% } %>
     </div>
   </form>
 </div>
@@ -110,32 +119,44 @@
 <% if (book.id) { %>
   <div class="card">
     <h2>Conceptos definidos en este libro</h2>
-    <p class="lead">(libro, concepto) &rarr; definicion. Un mismo concepto puede definirse distinto en otro libro.</p>
+    <p class="lead">
+      (libro, concepto) &rarr; definicion.
+      Un mismo concepto puede definirse distinto en otro libro.
+    </p>
 
-    <% if (!book.concepts.length) { %>
-      <p class="empty">Este libro aun no define conceptos.</p>
-    <% } %>
-    <% book.concepts.forEach(function (c) { %>
-      <form action="/admin/books/<%= book.id %>/concepts/<%= c.concept_id %>" method="POST" class="concept">
-        <div class="concept-name">
-          <a href="/admin/concepts/<%= c.concept_id %>"><%= c.name %></a>
-        </div>
-        <div class="field">
-          <label for="definition_<%= c.concept_id %>">Definicion en este libro</label>
-          <textarea id="definition_<%= c.concept_id %>" name="definition" required><%= c.definition %></textarea>
-        </div>
-        <div class="actions">
-          <button class="btn btn-primary btn-sm" type="submit">Actualizar definicion</button>
-        </div>
-      </form>
-      <form action="/admin/books/<%= book.id %>/concepts/<%= c.concept_id %>/delete" method="POST"
-            style="margin:-10px 0 18px 12px"
-            onsubmit="return confirm('Quitar el concepto &quot;<%= c.name %>&quot; de este libro?');">
-        <button class="btn btn-danger btn-sm" type="submit">Quitar concepto</button>
-      </form>
-    <% }); %>
+    <div class="mt-4">
+      <% if (!book.concepts.length) { %>
+        <p class="empty">Este libro aun no define conceptos.</p>
+      <% } %>
+      <% book.concepts.forEach(function (c) { %>
+        <div class="concept">
+          <p class="concept-name">
+            <a href="/admin/concepts/<%= c.concept_id %>"><%= c.name %></a>
+          </p>
 
-    <fieldset>
+          <form action="/admin/books/<%= book.id %>/concepts/<%= c.concept_id %>" method="POST"
+                id="concepto-<%= c.concept_id %>">
+            <div class="field">
+              <label for="definition_<%= c.concept_id %>" class="sr-only">Definicion de <%= c.name %> en este libro</label>
+              <textarea id="definition_<%= c.concept_id %>" name="definition" required><%= c.definition %></textarea>
+            </div>
+          </form>
+
+          <form action="/admin/books/<%= book.id %>/concepts/<%= c.concept_id %>/delete" method="POST"
+                id="quitar-<%= c.concept_id %>"
+                onsubmit="return confirm('Quitar el concepto &quot;<%= c.name %>&quot; de este libro?');"></form>
+
+          <%# Los botones viven fuera de los formularios y los referencian con el
+              atributo form: asi los dos envios conviven sin anidar formularios. %>
+          <div class="actions">
+            <button class="btn btn-primary btn-sm" type="submit" form="concepto-<%= c.concept_id %>">Actualizar definicion</button>
+            <button class="btn btn-danger btn-sm" type="submit" form="quitar-<%= c.concept_id %>">Quitar concepto</button>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+    <fieldset class="mt-5">
       <legend>Agregar concepto al libro</legend>
       <form action="/admin/books/<%= book.id %>/concepts" method="POST">
         <div class="form-row">
@@ -168,31 +189,34 @@
     <h2>Imagenes del libro</h2>
     <p class="lead">Un libro puede tener varias imagenes; solo una puede ser la portada.</p>
 
-    <form action="/admin/books/<%= book.id %>/images" method="POST" enctype="multipart/form-data">
+    <form action="/admin/books/<%= book.id %>/images" method="POST" enctype="multipart/form-data" class="mt-4">
       <div class="form-row">
         <div class="field">
           <label for="image">Archivo de imagen</label>
-          <input type="file" id="image" name="image" accept="image/png,image/jpeg,image/webp,image/gif" required>
-          <p class="hint">JPG, PNG, WEBP o GIF.</p>
+          <input type="file" id="image" name="image" accept="image/png,image/jpeg,image/webp,image/gif" required aria-describedby="image-hint">
+          <p class="hint" id="image-hint">JPG, PNG, WEBP o GIF.</p>
         </div>
         <div class="field">
           <label for="is_cover">Portada</label>
-          <label class="hint">
-            <input type="checkbox" id="is_cover" name="is_cover" style="width:auto">
+          <label class="check" for="is_cover">
+            <input type="checkbox" id="is_cover" name="is_cover">
             Usar esta imagen como portada
           </label>
         </div>
       </div>
       <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Cargar imagen</button>
+        <button class="btn btn-primary" type="submit">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          Cargar imagen
+        </button>
       </div>
     </form>
 
     <% if (book.images.length) { %>
-      <div class="image-admin" style="margin-top:18px">
+      <div class="image-admin mt-5">
         <% book.images.forEach(function (img) { %>
           <figure>
-            <img src="<%= img.url %>" alt="Imagen de <%= book.title %>">
+            <img src="<%= img.url %>" alt="Imagen de <%= book.title %>" loading="lazy" decoding="async">
             <figcaption>
               <% if (img.is_cover) { %><span class="badge badge-stock-ok">Portada</span><% } %>
               <div class="actions">

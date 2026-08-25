@@ -1,43 +1,110 @@
+<%
+  // Iconos de cada indicador (lucide, en linea: sin dependencias externas).
+  var icons = {
+    books:      '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',
+    authors:    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>',
+    genres:     '<path d="M7 7h.01M3 6v6.5a2 2 0 0 0 .6 1.4l7.5 7.5a2 2 0 0 0 2.8 0l6.5-6.5a2 2 0 0 0 0-2.8L12.9 3.6A2 2 0 0 0 11.5 3H5a2 2 0 0 0-2 2Z"/>',
+    concepts:   '<path d="M12 3a6 6 0 0 0-4 10.5V17h8v-3.5A6 6 0 0 0 12 3Z"/><path d="M9 21h6"/>',
+    images:     '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+    formats:    '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18M9 21V9"/>',
+    categories: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>',
+    users:      '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    stock:      '<path d="m7.5 4.27 9 5.15M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/>'
+  };
+  var cards = [
+    { key: 'books', label: 'Libros' },
+    { key: 'authors', label: 'Autores' },
+    { key: 'genres', label: 'Generos' },
+    { key: 'concepts', label: 'Conceptos' },
+    { key: 'images', label: 'Imagenes' },
+    { key: 'formats', label: 'Formatos' },
+    { key: 'categories', label: 'Categorias' },
+    { key: 'users', label: 'Usuarios' },
+    { key: 'stock', label: 'Unidades en stock' }
+  ];
+%>
 <div class="page-head">
   <div>
-    <h1>Panel de administracion</h1>
+    <p class="eyebrow">Administracion</p>
+    <h1>Panel de control</h1>
     <p class="lead">Resumen del modelo normalizado almacenado en PostgreSQL.</p>
   </div>
-  <a class="btn btn-primary" href="/admin/books/new">+ Nuevo libro</a>
+  <a class="btn btn-primary" href="/admin/books/new">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg>
+    Nuevo libro
+  </a>
 </div>
 
 <div class="stats">
-  <div class="stat"><div class="value"><%= stats.books %></div><div class="label">Libros</div></div>
-  <div class="stat"><div class="value"><%= stats.authors %></div><div class="label">Autores</div></div>
-  <div class="stat"><div class="value"><%= stats.genres %></div><div class="label">Generos</div></div>
-  <div class="stat"><div class="value"><%= stats.concepts %></div><div class="label">Conceptos</div></div>
-  <div class="stat"><div class="value"><%= stats.images %></div><div class="label">Imagenes</div></div>
-  <div class="stat"><div class="value"><%= stats.formats %></div><div class="label">Formatos</div></div>
-  <div class="stat"><div class="value"><%= stats.categories %></div><div class="label">Categorias</div></div>
-  <div class="stat"><div class="value"><%= stats.users %></div><div class="label">Usuarios</div></div>
-  <div class="stat"><div class="value"><%= stats.stock %></div><div class="label">Unidades en stock</div></div>
+  <% cards.forEach(function (c) { %>
+    <div class="stat" data-reveal>
+      <div class="stat-icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><%- icons[c.key] %></svg>
+      </div>
+      <div class="value"><%= stats[c.key] %></div>
+      <div class="label"><%= c.label %></div>
+    </div>
+  <% }); %>
 </div>
 
-<div class="card" style="margin-top:20px">
-  <h2>Modulos disponibles</h2>
-  <div class="grid grid-2">
-    <div>
-      <h3>Contenido</h3>
-      <ul>
-        <li><a href="/admin/books">Libros</a> &mdash; CRUD completo con autores, generos, conceptos e imagenes.</li>
-        <li><a href="/admin/authors">Autores</a> &mdash; libro &rarr;&rarr; autor (book_authors).</li>
-        <li><a href="/admin/genres">Generos</a> &mdash; libro &rarr;&rarr; genero (book_genres).</li>
-        <li><a href="/admin/concepts">Conceptos</a> &mdash; (libro, concepto) &rarr; definicion (book_concepts).</li>
-      </ul>
-    </div>
-    <div>
-      <h3>Catalogos y acceso</h3>
-      <ul>
-        <li><a href="/admin/formats">Formatos</a> &mdash; catalogo independiente.</li>
-        <li><a href="/admin/categories">Categorias</a> &mdash; catalogo independiente.</li>
-        <li><a href="/admin/users">Usuarios</a> &mdash; maximo un administrador.</li>
-        <li><a href="/catalog">Catalogo publico</a> &mdash; vista de los usuarios registrados.</li>
-      </ul>
-    </div>
+<div class="grid grid-2 mt-5">
+  <div class="card">
+    <h2>Contenido</h2>
+    <ul class="module-list">
+      <li>
+        <a href="/admin/books">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><%- icons.books %></svg>
+          <span><span class="m-name">Libros</span><span class="m-desc">CRUD completo con autores, generos, conceptos e imagenes.</span></span>
+        </a>
+      </li>
+      <li>
+        <a href="/admin/authors">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><%- icons.authors %></svg>
+          <span><span class="m-name">Autores</span><span class="m-desc">libro &rarr;&rarr; autor (book_authors).</span></span>
+        </a>
+      </li>
+      <li>
+        <a href="/admin/genres">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><%- icons.genres %></svg>
+          <span><span class="m-name">Generos</span><span class="m-desc">libro &rarr;&rarr; genero (book_genres).</span></span>
+        </a>
+      </li>
+      <li>
+        <a href="/admin/concepts">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><%- icons.concepts %></svg>
+          <span><span class="m-name">Conceptos</span><span class="m-desc">(libro, concepto) &rarr; definicion (book_concepts).</span></span>
+        </a>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Catalogos y acceso</h2>
+    <ul class="module-list">
+      <li>
+        <a href="/admin/formats">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><%- icons.formats %></svg>
+          <span><span class="m-name">Formatos</span><span class="m-desc">Catalogo independiente.</span></span>
+        </a>
+      </li>
+      <li>
+        <a href="/admin/categories">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><%- icons.categories %></svg>
+          <span><span class="m-name">Categorias</span><span class="m-desc">Catalogo independiente.</span></span>
+        </a>
+      </li>
+      <li>
+        <a href="/admin/users">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><%- icons.users %></svg>
+          <span><span class="m-name">Usuarios</span><span class="m-desc">Maximo un administrador.</span></span>
+        </a>
+      </li>
+      <li>
+        <a href="/catalog">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span><span class="m-name">Catalogo publico</span><span class="m-desc">Vista de los usuarios registrados.</span></span>
+        </a>
+      </li>
+    </ul>
   </div>
 </div>

@@ -1,13 +1,20 @@
 <div class="page-head">
   <div>
+    <p class="eyebrow">Administracion</p>
     <h1>Libros</h1>
-    <p class="lead"><%= total %> libro<%= total === 1 ? '' : 's' %> en el catalogo. ISBN &rarr; titulo, ano, precio, stock, formato y categoria.</p>
+    <p class="lead">
+      <%= total %> libro<%= total === 1 ? '' : 's' %> en el catalogo.
+      ISBN &rarr; titulo, ano, precio, stock, formato y categoria.
+    </p>
   </div>
-  <a class="btn btn-primary" href="/admin/books/new">+ Nuevo libro</a>
+  <a class="btn btn-primary" href="/admin/books/new">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg>
+    Nuevo libro
+  </a>
 </div>
 
 <div class="card">
-  <form action="/admin/books" method="GET" class="filters">
+  <form action="/admin/books" method="GET" class="filters" role="search">
     <div class="field">
       <label for="q">Buscar</label>
       <input type="search" id="q" name="q" value="<%= filters.search %>" placeholder="Titulo, ISBN o autor...">
@@ -61,40 +68,50 @@
     <table>
       <thead>
         <tr>
-          <th>Portada</th>
-          <th>ISBN</th>
+          <th><span class="sr-only">Portada</span></th>
           <th>Titulo / Autores</th>
-          <th>Formato</th>
-          <th>Categoria</th>
-          <th>Generos</th>
+          <th>ISBN</th>
+          <th>Clasificacion</th>
           <th class="num">Ano</th>
           <th class="num">Precio</th>
           <th class="num">Stock</th>
           <th class="num">Con. / Img.</th>
-          <th>Acciones</th>
+          <th><span class="sr-only">Acciones</span></th>
         </tr>
       </thead>
       <tbody>
-        <% if (!items.length) { %><tr><td colspan="11" class="empty">No hay libros que coincidan con el filtro.</td></tr><% } %>
+        <% if (!items.length) { %><tr><td colspan="9" class="empty">No hay libros que coincidan con el filtro.</td></tr><% } %>
         <% items.forEach(function (b) { %>
           <tr>
             <td>
               <% if (b.cover_url) { %>
-                <img src="<%= b.cover_url %>" alt="Portada de <%= b.title %>" style="width:44px;height:60px;object-fit:cover;border-radius:4px">
-              <% } else { %><span class="badge">sin imagen</span><% } %>
+                <img class="thumb" src="<%= b.cover_url %>" alt="Portada de <%= b.title %>" loading="lazy" decoding="async">
+              <% } else { %>
+                <span class="badge">sin imagen</span>
+              <% } %>
             </td>
-            <td><%= b.isbn %></td>
             <td>
               <strong><a href="/catalog/<%= b.id %>"><%= b.title %></a></strong><br>
               <span class="hint"><%= b.authors || 'Sin autores' %></span>
             </td>
-            <td><%= b.format_name %></td>
-            <td><%= b.category_name %></td>
-            <td><%= b.genres || '-' %></td>
+            <td class="mono hint"><%= b.isbn %></td>
+            <td>
+              <div class="badges">
+                <span class="badge"><%= b.format_name %></span>
+                <span class="badge"><%= b.category_name %></span>
+                <% if (b.genres) { %><span class="badge"><%= b.genres %></span><% } %>
+              </div>
+            </td>
             <td class="num"><%= b.publication_year %></td>
-            <td class="num">$<%= Number(b.price).toFixed(2) %></td>
-            <td class="num"><%= b.stock %></td>
-            <td class="num"><%= b.concepts_count %> / <%= b.images_count %></td>
+            <td class="num"><span class="price" style="font-size:.95rem">$<%= Number(b.price).toFixed(2) %></span></td>
+            <td class="num">
+              <% if (b.stock > 0) { %>
+                <span class="badge badge-stock-ok"><%= b.stock %></span>
+              <% } else { %>
+                <span class="badge badge-stock-out">0</span>
+              <% } %>
+            </td>
+            <td class="num hint"><%= b.concepts_count %> / <%= b.images_count %></td>
             <td>
               <div class="actions">
                 <a class="btn btn-secondary btn-sm" href="/admin/books/<%= b.id %>/edit">Editar</a>

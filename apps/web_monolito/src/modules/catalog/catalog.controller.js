@@ -13,14 +13,36 @@ const authors = require('../authors/authors.model');
 const genres = require('../genres/genres.model');
 const formats = require('../formats/formats.model');
 const categories = require('../categories/categories.model');
+const concepts = require('../concepts/concepts.model');
 
-/** Pagina de bienvenida publica. */
-const home = (req, res) => {
+/**
+ * Pagina de bienvenida publica.
+ *
+ * Solo publica totales agregados: el catalogo en si sigue reservado a
+ * usuarios con sesion activa (requireLogin en catalog.routes).
+ * Si PostgreSQL no responde, la portada se muestra igualmente sin cifras.
+ */
+const home = asyncHandler(async (req, res) => {
   if (req.session.user) {
     return res.redirect(req.session.user.role === 'admin' ? '/admin' : '/catalog');
   }
-  return res.page('catalog/views/home', { title: 'Bienvenido' });
-};
+
+  let highlights = null;
+  try {
+    const [bookCount, authorCount, genreCount, conceptCount] = await Promise.all([
+      books.count({}), authors.count(), genres.count(), concepts.count()
+    ]);
+    highlights = { books: bookCount, authors: authorCount, genres: genreCount, concepts: conceptCount };
+  } catch (err) {
+    highlights = null;
+  }
+
+  return res.page('catalog/views/home', {
+    title: 'Bienvenido',
+    highlights,
+    hasSpline: true
+  });
+});
 
 const index = asyncHandler(async (req, res) => {
   const filters = {

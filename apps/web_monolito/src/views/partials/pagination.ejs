@@ -1,8 +1,33 @@
 <% if (pagination && pagination.totalPages > 1) { %>
-  <nav class="pagination">
-    <% for (var p = 1; p <= pagination.totalPages; p++) { %>
+  <nav class="pagination" aria-label="Paginacion de resultados">
+    <%
+      var sep = pagination.baseUrl.indexOf('?') === -1 ? '?' : '&';
+      var first = Math.max(1, pagination.page - 2);
+      var last = Math.min(pagination.totalPages, first + 4);
+      first = Math.max(1, last - 4);
+    %>
+    <% if (pagination.page > 1) { %>
+      <a class="page" href="<%= pagination.baseUrl %><%= sep %>page=<%= pagination.page - 1 %>" rel="prev" aria-label="Pagina anterior">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+      </a>
+    <% } %>
+    <% if (first > 1) { %>
+      <a class="page" href="<%= pagination.baseUrl %><%= sep %>page=1">1</a>
+      <% if (first > 2) { %><span class="page" aria-hidden="true">&hellip;</span><% } %>
+    <% } %>
+    <% for (var p = first; p <= last; p++) { %>
       <a class="page <%= p === pagination.page ? 'current' : '' %>"
-         href="<%= pagination.baseUrl %><%= pagination.baseUrl.indexOf('?') === -1 ? '?' : '&' %>page=<%= p %>"><%= p %></a>
+         href="<%= pagination.baseUrl %><%= sep %>page=<%= p %>"
+         <%= p === pagination.page ? 'aria-current="page"' : '' %>><%= p %></a>
+    <% } %>
+    <% if (last < pagination.totalPages) { %>
+      <% if (last < pagination.totalPages - 1) { %><span class="page" aria-hidden="true">&hellip;</span><% } %>
+      <a class="page" href="<%= pagination.baseUrl %><%= sep %>page=<%= pagination.totalPages %>"><%= pagination.totalPages %></a>
+    <% } %>
+    <% if (pagination.page < pagination.totalPages) { %>
+      <a class="page" href="<%= pagination.baseUrl %><%= sep %>page=<%= pagination.page + 1 %>" rel="next" aria-label="Pagina siguiente">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      </a>
     <% } %>
   </nav>
 <% } %>

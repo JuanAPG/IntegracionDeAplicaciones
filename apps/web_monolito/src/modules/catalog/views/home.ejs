@@ -1,12 +1,126 @@
-<section class="card card-centered">
-  <h1>Libreria en Linea</h1>
-  <p class="lead">
-    Aplicacion web monolitica con renderizado HTML del lado del servidor y acceso
-    directo a PostgreSQL. Inicie sesion para consultar el catalogo, sus autores,
-    generos, imagenes y los conceptos definidos por cada libro.
-  </p>
-  <div class="form-actions" style="justify-content:center">
-    <a class="btn btn-primary" href="/auth/login">Iniciar sesion</a>
-    <a class="btn btn-secondary" href="/auth/register">Crear cuenta</a>
+<%
+  // Portada publica: hero 3D + propuesta de valor.
+  // Equivale al componente <SplineSceneBasic>: tarjeta oscura a pantalla
+  // completa, spotlight que sigue al cursor y escena de Spline a la derecha.
+%>
+<section class="hero" data-spotlight data-spotlight-size="340" aria-labelledby="hero-title">
+  <div class="hero-layout">
+    <div class="hero-copy">
+      <p class="eyebrow">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/></svg>
+        Catalogo bibliografico
+      </p>
+
+      <h1 class="hero-title gradient-text" id="hero-title">
+        Su biblioteca,<br>en tres dimensiones
+      </h1>
+
+      <p class="lead">
+        Explore titulos con sus autores, generos, formatos, portadas y las
+        definiciones de conceptos que cada libro propone. Todo el contenido
+        se genera en el servidor y se guarda en un modelo normalizado de
+        PostgreSQL.
+      </p>
+
+      <div class="hero-actions">
+        <a class="btn btn-primary btn-lg" href="/auth/login">
+          Iniciar sesion
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+        <a class="btn btn-secondary btn-lg" href="/auth/register">Crear cuenta</a>
+      </div>
+
+      <% if (highlights) { %>
+        <dl class="hero-metrics">
+          <div class="hero-metric">
+            <dt class="label">Libros</dt>
+            <dd class="value"><%= highlights.books %></dd>
+          </div>
+          <div class="hero-metric">
+            <dt class="label">Autores</dt>
+            <dd class="value"><%= highlights.authors %></dd>
+          </div>
+          <div class="hero-metric">
+            <dt class="label">Generos</dt>
+            <dd class="value"><%= highlights.genres %></dd>
+          </div>
+          <div class="hero-metric">
+            <dt class="label">Conceptos</dt>
+            <dd class="value"><%= highlights.concepts %></dd>
+          </div>
+        </dl>
+      <% } %>
+    </div>
+
+    <div class="hero-scene">
+      <!-- Escena 3D: decorativa. La pagina es totalmente utilizable sin ella. -->
+      <canvas
+        data-spline-scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+        aria-hidden="true"
+        aria-busy="true"></canvas>
+      <div class="scene-fallback">
+        <span class="loader" role="presentation"></span>
+        <span class="sr-only">Cargando escena tridimensional decorativa</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="modelo-title">
+  <div class="page-head">
+    <div>
+      <h2 id="modelo-title">Que guarda el sistema</h2>
+      <p class="lead">
+        El modelo resuelve las dependencias funcionales y multivaluadas del dominio,
+        cada una en su propia tabla.
+      </p>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <article class="card" data-reveal>
+      <div class="stat-icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+      </div>
+      <h3>Libros y catalogos</h3>
+      <p class="lead">
+        <strong>ISBN</strong> determina titulo, ano, precio, stock, formato y categoria.
+        Formato y categoria son catalogos independientes reutilizables.
+      </p>
+    </article>
+
+    <article class="card" data-reveal>
+      <div class="stat-icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <h3>Autores y generos</h3>
+      <p class="lead">
+        Relaciones multivaluadas <strong>libro &rarr;&rarr; autor</strong> y
+        <strong>libro &rarr;&rarr; genero</strong>, resueltas con tablas puente
+        para evitar valores repetidos.
+      </p>
+    </article>
+
+    <article class="card" data-reveal>
+      <div class="stat-icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M8 7h8M8 11h5"/></svg>
+      </div>
+      <h3>Conceptos por libro</h3>
+      <p class="lead">
+        El par <strong>(libro, concepto)</strong> determina la definicion: un mismo
+        concepto puede explicarse de forma distinta en cada titulo.
+      </p>
+    </article>
+
+    <article class="card" data-reveal>
+      <div class="stat-icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+      </div>
+      <h3>Imagenes y portada</h3>
+      <p class="lead">
+        Un libro admite varias imagenes cargadas desde el navegador; solo una
+        queda marcada como portada.
+      </p>
+    </article>
   </div>
 </section>

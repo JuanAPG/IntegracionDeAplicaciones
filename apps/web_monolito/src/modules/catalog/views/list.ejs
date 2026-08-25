@@ -1,12 +1,16 @@
 <div class="page-head">
   <div>
+    <p class="eyebrow">Coleccion completa</p>
     <h1>Catalogo</h1>
     <p class="lead"><%= total %> libro<%= total === 1 ? '' : 's' %> disponible<%= total === 1 ? '' : 's' %>.</p>
   </div>
+  <% if (isAdmin) { %>
+    <a class="btn btn-secondary" href="/admin/books">Administrar libros</a>
+  <% } %>
 </div>
 
 <div class="card">
-  <form action="/catalog" method="GET" class="filters">
+  <form action="/catalog" method="GET" class="filters" role="search" aria-label="Filtrar catalogo">
     <div class="field">
       <label for="q">Buscar</label>
       <input type="search" id="q" name="q" value="<%= filters.search %>" placeholder="Titulo, ISBN o autor...">
@@ -58,45 +62,58 @@
       </select>
     </div>
     <div class="field">
-      <label for="available">Disponibilidad</label>
-      <label class="hint">
-        <input type="checkbox" id="available" name="available" value="1" style="width:auto" <%= filters.onlyAvailable ? 'checked' : '' %>>
+      <span class="label-text">Disponibilidad</span>
+      <label class="check" for="available">
+        <input type="checkbox" id="available" name="available" value="1" <%= filters.onlyAvailable ? 'checked' : '' %>>
         Solo con stock
       </label>
     </div>
     <div class="form-actions">
-      <button class="btn btn-primary" type="submit">Filtrar</button>
+      <button class="btn btn-primary" type="submit">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        Filtrar
+      </button>
       <a class="btn btn-secondary" href="/catalog">Limpiar</a>
     </div>
   </form>
 </div>
 
 <% if (!items.length) { %>
-  <div class="card"><p class="empty">No se encontraron libros con esos criterios.</p></div>
+  <div class="card">
+    <p class="empty">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="opacity:.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><br>
+      No se encontraron libros con esos criterios.
+    </p>
+  </div>
 <% } else { %>
   <div class="grid grid-cards">
     <% items.forEach(function (b) { %>
-      <article class="book-card">
-        <a href="/catalog/<%= b.id %>">
+      <article class="book-card" data-reveal>
+        <a class="book-cover-link" href="/catalog/<%= b.id %>" tabindex="-1" aria-hidden="true">
           <% if (b.cover_url) { %>
-            <img class="book-cover" src="<%= b.cover_url %>" alt="Portada de <%= b.title %>">
+            <img class="book-cover" src="<%= b.cover_url %>" alt="" loading="lazy" decoding="async">
           <% } else { %>
-            <div class="book-cover-placeholder">Sin portada</div>
+            <div class="book-cover-placeholder">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+              Sin portada
+            </div>
           <% } %>
         </a>
         <div class="book-card-body">
-          <div class="book-card-title"><a href="/catalog/<%= b.id %>"><%= b.title %></a></div>
-          <div class="hint"><%= b.authors || 'Sin autores registrados' %></div>
+          <h2 class="book-card-title"><a href="/catalog/<%= b.id %>"><%= b.title %></a></h2>
+          <p class="hint"><%= b.authors || 'Sin autores registrados' %></p>
           <div class="badges">
             <span class="badge"><%= b.format_name %></span>
             <span class="badge"><%= b.publication_year %></span>
+          </div>
+          <div class="book-card-foot">
+            <span class="price">$<%= Number(b.price).toFixed(2) %></span>
             <% if (b.stock > 0) { %>
               <span class="badge badge-stock-ok">Stock: <%= b.stock %></span>
             <% } else { %>
               <span class="badge badge-stock-out">Agotado</span>
             <% } %>
           </div>
-          <div class="price">$<%= Number(b.price).toFixed(2) %></div>
         </div>
       </article>
     <% }); %>

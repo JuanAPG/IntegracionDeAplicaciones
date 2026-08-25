@@ -1,11 +1,14 @@
 <div class="card card-form">
+  <p class="eyebrow"><%= meta.title %></p>
   <h1><%= title %></h1>
   <p class="lead"><%= meta.description %></p>
-  <form action="<%= item.id ? meta.basePath + '/' + item.id : meta.basePath %>" method="POST">
+
+  <form action="<%= item.id ? meta.basePath + '/' + item.id : meta.basePath %>" method="POST" class="mt-5">
     <div class="field">
       <label for="name"><%= meta.nameLabel %></label>
-      <input type="text" id="name" name="name" value="<%= item.name %>" required maxlength="<%= meta.maxLength || 150 %>" autofocus>
-      <p class="hint">Debe ser unico dentro del catalogo.</p>
+      <input type="text" id="name" name="name" value="<%= item.name %>" required
+             maxlength="<%= meta.maxLength || 150 %>" autofocus aria-describedby="name-hint">
+      <p class="hint" id="name-hint">Debe ser unico dentro del catalogo.</p>
     </div>
     <div class="form-actions">
       <button class="btn btn-primary" type="submit"><%= item.id ? 'Guardar cambios' : 'Crear' %></button>

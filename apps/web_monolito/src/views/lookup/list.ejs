@@ -1,13 +1,17 @@
 <div class="page-head">
   <div>
+    <p class="eyebrow">Administracion</p>
     <h1><%= meta.title %></h1>
-    <p class="lead"><%= meta.description %> (<%= total %> registro<%= total === 1 ? '' : 's' %>)</p>
+    <p class="lead"><%= meta.description %> &middot; <%= total %> registro<%= total === 1 ? '' : 's' %>.</p>
   </div>
-  <a class="btn btn-primary" href="<%= meta.basePath %>/new">+ Nuevo <%= meta.singular %></a>
+  <a class="btn btn-primary" href="<%= meta.basePath %>/new">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg>
+    Nuevo <%= meta.singular %>
+  </a>
 </div>
 
 <div class="card">
-  <form action="<%= meta.basePath %>" method="GET" class="filters">
+  <form action="<%= meta.basePath %>" method="GET" class="filters" role="search">
     <div class="field">
       <label for="q">Buscar</label>
       <input type="search" id="q" name="q" value="<%= search %>" placeholder="Nombre...">
@@ -27,7 +31,7 @@
           <th class="num">ID</th>
           <th><%= meta.nameLabel %></th>
           <th class="num"><%= meta.usageLabel %></th>
-          <th>Acciones</th>
+          <th><span class="sr-only">Acciones</span></th>
         </tr>
       </thead>
       <tbody>
@@ -39,12 +43,12 @@
             <td class="num"><%= item.id %></td>
             <td>
               <% if (meta.detailPath) { %>
-                <a href="<%= meta.basePath %>/<%= item.id %>"><%= item.name %></a>
+                <a href="<%= meta.basePath %>/<%= item.id %>"><strong><%= item.name %></strong></a>
               <% } else { %>
-                <%= item.name %>
+                <strong><%= item.name %></strong>
               <% } %>
             </td>
-            <td class="num"><%= item.books_count %></td>
+            <td class="num"><span class="badge"><%= item.books_count %></span></td>
             <td>
               <div class="actions">
                 <a class="btn btn-secondary btn-sm" href="<%= meta.basePath %>/<%= item.id %>/edit">Editar</a>

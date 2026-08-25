@@ -23,8 +23,21 @@ app.set('views', [path.join(__dirname, 'modules'), path.join(__dirname, 'views')
 // la aplicacion no intercambia datos en JSON ni XML.
 app.use(express.urlencoded({ extended: false }));
 
-// --- Archivos estaticos (CSS e imagenes cargadas) ----------------------
+// --- Archivos estaticos (CSS, JS de interfaz e imagenes cargadas) ------
 app.use(express.static(path.join(__dirname, 'public')));
+
+// --- Runtime 3D de Spline ----------------------------------------------
+// El paquete @splinetool/runtime se publica como ESM nativo: se sirve tal
+// cual desde node_modules, sin bundler ni paso de compilacion. Solo se
+// usan modulos y binarios estaticos del motor 3D; la aplicacion sigue sin
+// exponer APIs ni intercambiar JSON/XML.
+app.use(
+  '/vendor/spline',
+  express.static(path.join(require.resolve('@splinetool/runtime'), '..'), {
+    immutable: true,
+    maxAge: '30d'
+  })
+);
 
 // --- Sesion de usuarios registrados ------------------------------------
 app.use(session({

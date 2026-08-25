@@ -1,8 +1,26 @@
 <footer class="footer">
-  <div class="container">
-    <p>
-      <%= appName %> &mdash; Aplicacion monolitica Node.js + Express + EJS + PostgreSQL.
-      HTML renderizado en el servidor, sin APIs REST/GraphQL/SOAP ni JSON/XML.
-    </p>
+  <div class="container footer-inner">
+    <div>
+      <span class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>
+          </svg>
+        </span>
+        <%= appName %>
+      </span>
+      <p class="footer-note mt-4">
+        Aplicacion monolitica con HTML renderizado en el servidor.
+        Sin APIs REST, GraphQL o SOAP, y sin JSON o XML como formato de intercambio.
+      </p>
+      <div class="stack-chips">
+        <span class="badge">Node.js</span>
+        <span class="badge">Express</span>
+        <span class="badge">EJS</span>
+        <span class="badge">PostgreSQL</span>
+        <span class="badge">MVC por modulos</span>
+      </div>
+    </div>
+    <p class="footer-note">&copy; <%= new Date().getFullYear() %> <%= appName %></p>
   </div>
 </footer>

@@ -19,6 +19,7 @@ renderiza HTML en el servidor y accede **directamente a PostgreSQL**.
 | CRUD del modelo normalizado | Todas las tablas: `users`, `books`, `authors`, `genres`, `concepts`, `formats`, `categories`, `book_authors`, `book_genres`, `book_concepts`, `book_images` |
 | Manejo de imagenes | Carga por formulario, almacenamiento en disco, ruta persistida en `book_images`, portada unica por libro |
 | Conceptos por libro | `book_concepts` guarda la definicion propia de cada par (libro, concepto) |
+| Interfaz | Sistema de diseño propio en una sola hoja de estilos (tema oscuro, glassmorphism) y hero 3D de Spline. Sin React, TypeScript, Tailwind ni paso de compilacion. Detalle en [`docs/UI.md`](docs/UI.md) |
 
 `package.json` existe unicamente porque npm lo requiere para administrar el
 proyecto Node.js; no se usa JSON como formato de intercambio de datos.
@@ -70,8 +71,14 @@ apps/web_monolito/
     │   ├── users/             CRUD de usuarios y panel de administracion
     │   └── index.js           Router que compone todos los modulos
     ├── views/                 layout, parciales y vistas compartidas
-    └── public/                CSS e imagenes cargadas (public/uploads)
+    └── public/
+        ├── css/styles.css     Sistema de diseño unico (tokens + componentes)
+        ├── js/                Mejoras progresivas: menu movil, hero 3D, spotlight
+        └── uploads/           Imagenes cargadas por el administrador
 ```
+
+La carpeta `docs/` documenta el sistema de diseño y el port a JavaScript plano
+de los componentes de React usados como referencia.
 
 ## 4. Mapa de rutas (todas devuelven HTML)
 
@@ -94,7 +101,46 @@ apps/web_monolito/
 
 ---
 
-# 5. Despliegue en CentOS 10 Stream
+# 5. Interfaz de usuario
+
+La capa View sigue siendo EJS renderizado en el servidor. El aspecto visual lo
+define una unica hoja de estilos, `src/public/css/styles.css`, organizada como
+sistema de diseño con variables CSS.
+
+- **Tema oscuro** con superficies de vidrio (`backdrop-filter`), primario
+  violeta `#7C3AED` e indigo `#6366F1`, tipografia `Outfit` + `Inter`.
+- **Portada con hero 3D**: una escena de Spline en un `<canvas>`, con un foco
+  radial que sigue al cursor.
+- **Sin framework de interfaz**: no hay React, TypeScript, Tailwind, shadcn/ui
+  ni bundler. Los tres componentes de React tomados como referencia
+  (`SplineScene`, `Spotlight` y `Card`) estan portados a JavaScript plano y CSS.
+- **Unica dependencia nueva**: `@splinetool/runtime`, servido como ESM nativo
+  desde `node_modules` en la ruta estatica `/vendor/spline`.
+- **Degradacion elegante**: sin WebGL, con `prefers-reduced-motion` o si la
+  escena falla, se muestra un orbe estatico. La aplicacion es utilizable sin
+  JavaScript, porque todo el HTML llega renderizado y cada accion es un
+  formulario.
+- **Accesibilidad**: contraste AA, foco visible, objetivos tactiles de 44 px,
+  enlace de salto al contenido e iconos SVG en linea.
+
+El detalle completo —tokens, mapeo componente a componente y decisiones de
+arquitectura— esta en [`docs/UI.md`](docs/UI.md).
+
+## Vista previa sin base de datos
+
+Para revisar las 19 pantallas con datos de prueba, sin PostgreSQL:
+
+```bash
+npm start
+# http://localhost:3000/__preview__/
+```
+
+Esa carpeta se genera aparte, esta excluida de git y puede borrarse con
+`rm -rf src/public/__preview__`.
+
+---
+
+# 6. Despliegue en CentOS 10 Stream
 
 Se asume que **PostgreSQL ya esta instalado y en ejecucion**, con:
 
@@ -104,7 +150,7 @@ Se asume que **PostgreSQL ya esta instalado y en ejecucion**, con:
 
 Todos los comandos se ejecutan como un usuario con `sudo`.
 
-## 5.1 Instalar Node.js
+## 6.1 Instalar Node.js
 
 ```bash
 sudo dnf -y update
@@ -120,7 +166,7 @@ curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
 sudo dnf -y install nodejs
 ```
 
-## 5.2 Verificar el acceso a PostgreSQL
+## 6.2 Verificar el acceso a PostgreSQL
 
 ```bash
 sudo dnf -y install postgresql          # solo el cliente psql, si falta
@@ -154,7 +200,7 @@ sudo -u postgres psql -d library_db -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;
 > `pgcrypto` requiere privilegios de superusuario, por eso se crea con el
 > usuario `postgres`. El paquete `postgresql-contrib` debe estar instalado.
 
-## 5.3 Crear el usuario de servicio y copiar la aplicacion
+## 6.3 Crear el usuario de servicio y copiar la aplicacion
 
 ```bash
 sudo useradd --system --create-home --home-dir /opt/library --shell /sbin/nologin library
@@ -172,14 +218,14 @@ Estructura esperada en el servidor:
 └── apps/web_monolito/
 ```
 
-## 5.4 Instalar dependencias
+## 6.4 Instalar dependencias
 
 ```bash
 cd /opt/library/app/apps/web_monolito
 sudo -u library npm ci --omit=dev      # o: sudo -u library npm install --omit=dev
 ```
 
-## 5.5 Configurar el entorno
+## 6.5 Configurar el entorno
 
 ```bash
 sudo -u library cp .env.example .env
@@ -221,7 +267,7 @@ sudo chmod 600 /opt/library/app/apps/web_monolito/.env
 sudo chown library:library /opt/library/app/apps/web_monolito/.env
 ```
 
-## 5.6 Crear el esquema y el administrador
+## 6.6 Crear el esquema y el administrador
 
 ```bash
 cd /opt/library/app/apps/web_monolito
@@ -251,7 +297,7 @@ psql "postgresql://library_user:777@localhost:5432/library_db" -f /opt/library/a
 sudo -u library node scripts/setup-db.js --seed-only
 ```
 
-## 5.7 Permisos del directorio de imagenes
+## 6.7 Permisos del directorio de imagenes
 
 Las imagenes cargadas se guardan en `src/public/uploads`:
 
@@ -261,7 +307,7 @@ sudo chown -R library:library /opt/library/app/apps/web_monolito/src/public/uplo
 sudo chmod 750 /opt/library/app/apps/web_monolito/src/public/uploads
 ```
 
-## 5.8 Servicio systemd
+## 6.8 Servicio systemd
 
 ```bash
 sudo tee /etc/systemd/system/library.service > /dev/null <<'EOF'
@@ -306,7 +352,7 @@ Ver los registros:
 sudo journalctl -u library.service -f
 ```
 
-## 5.9 Firewall (firewalld)
+## 6.9 Firewall (firewalld)
 
 Acceso directo al puerto 3000:
 
@@ -315,7 +361,7 @@ sudo firewall-cmd --permanent --add-port=3000/tcp
 sudo firewall-cmd --reload
 ```
 
-## 5.10 Nginx como proxy inverso (recomendado)
+## 6.10 Nginx como proxy inverso (recomendado)
 
 ```bash
 sudo dnf -y install nginx
@@ -345,7 +391,7 @@ sudo firewall-cmd --permanent --add-service=http
 sudo firewall-cmd --reload
 ```
 
-## 5.11 Verificacion
+## 6.11 Verificacion
 
 ```bash
 curl -I http://localhost:3000/            # HTTP/1.1 200 OK
@@ -361,7 +407,7 @@ Desde el navegador: `http://<ip-del-servidor>/`
 
 ---
 
-# 6. Operacion
+# 7. Operacion
 
 ## Actualizar la aplicacion
 
@@ -415,7 +461,7 @@ los datos de la aplicacion no se ven afectados porque residen en PostgreSQL.
 
 ---
 
-# 7. Ejecucion en un entorno de desarrollo
+# 8. Ejecucion en un entorno de desarrollo
 
 ```bash
 cd apps/web_monolito

@@ -1,13 +1,20 @@
 <div class="page-head">
   <div>
+    <p class="eyebrow">Administracion</p>
     <h1>Usuarios</h1>
-    <p class="lead">Usuarios registrados (<%= total %>). El sistema admite como maximo un administrador.</p>
+    <p class="lead">
+      <%= total %> usuario<%= total === 1 ? '' : 's' %> registrado<%= total === 1 ? '' : 's' %>.
+      El sistema admite como maximo un administrador.
+    </p>
   </div>
-  <a class="btn btn-primary" href="/admin/users/new">+ Nuevo usuario</a>
+  <a class="btn btn-primary" href="/admin/users/new">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg>
+    Nuevo usuario
+  </a>
 </div>
 
 <div class="card">
-  <form action="/admin/users" method="GET" class="filters">
+  <form action="/admin/users" method="GET" class="filters" role="search">
     <div class="field">
       <label for="q">Buscar</label>
       <input type="search" id="q" name="q" value="<%= search %>" placeholder="Nombre o correo...">
@@ -33,21 +40,27 @@
       <thead>
         <tr>
           <th class="num">ID</th>
-          <th>Nombre</th>
-          <th>Correo</th>
+          <th>Usuario</th>
           <th>Rol</th>
           <th>Estado</th>
           <th>Alta</th>
-          <th>Acciones</th>
+          <th><span class="sr-only">Acciones</span></th>
         </tr>
       </thead>
       <tbody>
-        <% if (!items.length) { %><tr><td colspan="7" class="empty">Sin usuarios.</td></tr><% } %>
+        <% if (!items.length) { %><tr><td colspan="6" class="empty">Sin usuarios.</td></tr><% } %>
         <% items.forEach(function (u) { %>
           <tr>
             <td class="num"><%= u.id %></td>
-            <td><%= u.full_name %></td>
-            <td><%= u.email %></td>
+            <td>
+              <div class="user-cell">
+                <span class="avatar" aria-hidden="true"><%= u.full_name.trim().charAt(0).toUpperCase() %></span>
+                <span>
+                  <strong><%= u.full_name %></strong><br>
+                  <span class="hint"><%= u.email %></span>
+                </span>
+              </div>
+            </td>
             <td><span class="role-tag <%= u.role %>"><%= u.role %></span></td>
             <td>
               <% if (u.is_active) { %><span class="badge badge-stock-ok">activo</span>
