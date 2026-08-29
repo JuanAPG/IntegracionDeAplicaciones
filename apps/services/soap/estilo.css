@@ -1,0 +1,1012 @@
+@charset "UTF-8";
+
+/* =====================================================================
+   library/apps/services/soap/estilo.css
+
+   Hoja de estilo para presentar directamente library01.xml en el
+   navegador, sin XSLT ni JavaScript.
+
+   Se activa con la instruccion de procesamiento declarada en el XML:
+       <?xml-stylesheet type="text/css" href="estilo.css"?>
+
+   Notas de implementacion
+   * El XML declara el espacio de nombres por defecto
+     "urn:library:catalog:1.0", por lo que la hoja lo declara con
+     @namespace: sin eso los selectores de tipo (book, title, ...) no
+     coinciden con ningun elemento.
+   * En XML TODO elemento nace con display:inline. Cada elemento que deba
+     ocupar una linea o formar una caja declara su display de forma
+     explicita.
+   * El texto de los elementos no es seleccionable desde CSS, pero los
+     ATRIBUTOS si: attr() alimenta las etiquetas (ISBN, moneda, contadores)
+     y los selectores [ref], [isCover] y [count] aportan la logica visual.
+   * El orden visual de la tarjeta se reordena con flexbox (order) sin
+     tocar el orden del documento XML.
+   ===================================================================== */
+
+@namespace lib "urn:library:catalog:1.0";
+
+
+/* ---------------------------------------------------------------------
+   1. TOKENS DE DISENO
+   --------------------------------------------------------------------- */
+:root {
+  /* superficies */
+  --bg:            #f6f7f9;
+  --bg-grad-a:     #eef2f7;
+  --bg-grad-b:     #f8fafc;
+  --surface:       #ffffff;
+  --surface-soft:  #f4f6f9;
+  --border:        #e2e6ec;
+  --border-strong: #cfd6e0;
+
+  /* texto */
+  --text:          #14181f;
+  --text-soft:     #4a5462;
+  --text-muted:    #78828f;
+
+  /* acentos */
+  --accent:        #3d5afe;
+  --accent-soft:   #eaeeff;
+  --accent-text:   #2a3eb1;
+  --gold:          #b07d1a;
+  --gold-soft:     #fdf4e0;
+  --ok:            #1f7a52;
+  --ok-soft:       #e6f5ee;
+  --danger:        #b3261e;
+  --danger-soft:   #fdeceb;
+  --flag-bg:       #b3261e;
+  --flag-fg:       #ffffff;
+
+  /* formato del libro (atributo format[ref]) */
+  --fmt-1:         #2f6fd0;   /* Fisico     */
+  --fmt-1-soft:    #e8f0fd;
+  --fmt-2:         #7a3fd0;   /* Digital    */
+  --fmt-2-soft:    #f2ebfd;
+  --fmt-3:         #b0651a;   /* Audiolibro */
+  --fmt-3-soft:    #fdf1e3;
+  --fmt-4:         #1f7a52;   /* Pasta dura */
+  --fmt-4-soft:    #e6f5ee;
+
+  /* forma */
+  --radius:        16px;
+  --radius-sm:     8px;
+  --radius-pill:   999px;
+  --shadow:        0 1px 2px rgba(16, 24, 40, .05),
+                   0 8px 24px -12px rgba(16, 24, 40, .18);
+  --shadow-hover:  0 2px 4px rgba(16, 24, 40, .06),
+                   0 18px 40px -16px rgba(16, 24, 40, .28);
+
+  /* tipografia */
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
+           "Times New Roman", serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+          "Liberation Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:            #0d1017;
+    --bg-grad-a:     #11151f;
+    --bg-grad-b:     #0b0e14;
+    --surface:       #151a24;
+    --surface-soft:  #1b2130;
+    --border:        #262e3d;
+    --border-strong: #36405222;
+
+    --text:          #eef1f6;
+    --text-soft:     #b3bcca;
+    --text-muted:    #7f8b9c;
+
+    --accent:        #8ba4ff;
+    --accent-soft:   #1c2440;
+    --accent-text:   #a8bcff;
+    --gold:          #e0b155;
+    --gold-soft:     #2a2314;
+    --ok:            #5fd3a0;
+    --ok-soft:       #10281f;
+    --danger:        #ff8a80;
+    --danger-soft:   #331614;
+    --flag-bg:       #ff8a80;
+    --flag-fg:       #2b0d0b;
+
+    --fmt-1:         #6fa6ff;  --fmt-1-soft: #14203a;
+    --fmt-2:         #b98bff;  --fmt-2-soft: #241a3a;
+    --fmt-3:         #e5a860;  --fmt-3-soft: #2e2113;
+    --fmt-4:         #5fd3a0;  --fmt-4-soft: #10281f;
+
+    --shadow:        0 1px 2px rgba(0, 0, 0, .5),
+                     0 10px 28px -14px rgba(0, 0, 0, .8);
+    --shadow-hover:  0 2px 6px rgba(0, 0, 0, .55),
+                     0 22px 46px -18px rgba(0, 0, 0, .9);
+  }
+}
+
+* { box-sizing: border-box; }
+
+
+/* ---------------------------------------------------------------------
+   2. RAIZ / LIENZO
+   El fondo del elemento raiz se propaga al lienzo del navegador.
+   --------------------------------------------------------------------- */
+lib|library {
+  display: block;
+  min-height: 100vh;
+  padding: clamp(1.5rem, 4vw, 4rem) clamp(1rem, 5vw, 4rem) 4rem;
+  background:
+    radial-gradient(1100px 520px at 12% -8%,  var(--accent-soft) 0%, transparent 62%),
+    radial-gradient(900px 460px at 92% 4%,    var(--gold-soft)   0%, transparent 58%),
+    linear-gradient(180deg, var(--bg-grad-a) 0%, var(--bg-grad-b) 46%, var(--bg) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Encabezado ------------------------------------------------------- */
+lib|library::before {
+  content: "Catálogo de Libros";
+  display: block;
+  max-width: 1400px;
+  margin: 0 auto .35rem;
+  font-family: var(--serif);
+  font-size: clamp(2.1rem, 5.6vw, 3.6rem);
+  font-weight: 600;
+  letter-spacing: -.022em;
+  line-height: 1.05;
+  color: var(--text);
+}
+
+/* Pie: metadatos del documento, tomados de los atributos de <library> */
+lib|library::after {
+  content: "Fuente " attr(source)
+           "  ·  esquema " attr(schema)
+           "  ·  versión " attr(version)
+           "  ·  generado " attr(generatedAt);
+  display: block;
+  max-width: 1400px;
+  margin: 3rem auto 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: .72rem;
+  letter-spacing: .01em;
+  color: var(--text-muted);
+}
+
+
+/* ---------------------------------------------------------------------
+   3. REJILLA DE TARJETAS
+   --------------------------------------------------------------------- */
+lib|books {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr));
+  gap: clamp(1rem, 1.8vw, 1.6rem);
+  align-items: start;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Subtitulo: ocupa el ancho completo como primer elemento de la rejilla */
+lib|books::before {
+  content: attr(count) " títulos en el catálogo";
+  grid-column: 1 / -1;
+  margin: 0 0 .9rem;
+  font-size: .96rem;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+
+/* ---------------------------------------------------------------------
+   4. TARJETA DE LIBRO
+   El XML ordena: title, publicationYear, price, stock, format, category,
+   authors, genres, concepts, images.
+   La propiedad `order` reordena la lectura sin alterar el documento.
+   --------------------------------------------------------------------- */
+lib|book {
+  --rule: var(--accent);
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: flex-start;
+  gap: .55rem .5rem;
+  position: relative;
+  overflow: hidden;
+  padding: 1.5rem 1.5rem 1.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+
+  /* Filete superior tenido segun el formato; va en el fondo de la
+     tarjeta para dejar libre ::after, que se usa como salto de linea. */
+  background-color: var(--surface);
+  background-image: linear-gradient(90deg, var(--rule), transparent 88%);
+  background-repeat: no-repeat;
+  background-size: 100% 3px;
+  background-position: 0 0;
+
+  box-shadow: var(--shadow);
+  transition: transform .22s ease, box-shadow .22s ease,
+              border-color .22s ease;
+}
+
+lib|book:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-hover);
+}
+
+lib|book:has(lib|format[ref="1"]) { --rule: var(--fmt-1); }
+lib|book:has(lib|format[ref="2"]) { --rule: var(--fmt-2); }
+lib|book:has(lib|format[ref="3"]) { --rule: var(--fmt-3); }
+lib|book:has(lib|format[ref="4"]) { --rule: var(--fmt-4); }
+
+/* Salto de linea del flexbox: obliga a que las metricas empiecen en una
+   fila propia, por debajo de las pildoras de formato y categoria.
+   Sin envoltorios en el XML, un pseudo-elemento a ancho completo es la
+   unica forma de partir la linea. */
+lib|book::after {
+  content: "";
+  order: 4;
+  flex: 1 0 100%;
+  height: 0;
+  margin: 0;
+}
+
+/* Antetítulo: número de registro + ISBN (atributos del elemento) */
+lib|book::before {
+  content: "N.º " attr(id) "   ·   ISBN " attr(isbn);
+  order: 0;
+  flex: 1 0 100%;
+  font-family: var(--mono);
+  font-size: .68rem;
+  font-weight: 500;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+
+/* ---------------------------------------------------------------------
+   5. IDENTIDAD DEL LIBRO
+   --------------------------------------------------------------------- */
+lib|title {
+  order: 1;
+  flex: 1 0 100%;
+  margin: .1rem 0 0;
+  font-family: var(--serif);
+  font-size: 1.34rem;
+  font-weight: 600;
+  line-height: 1.24;
+  letter-spacing: -.012em;
+  text-wrap: balance;
+  color: var(--text);
+}
+
+/* Autores: "por A · B · C"  (MVD libro ->> autor) */
+lib|authors {
+  order: 2;
+  flex: 1 0 100%;
+  margin-bottom: .35rem;
+  font-size: .875rem;
+  color: var(--text-soft);
+}
+lib|authors::before {
+  content: "por ";
+  color: var(--text-muted);
+  font-style: italic;
+}
+lib|author { display: inline; }
+lib|author + lib|author::before {
+  content: "  ·  ";
+  color: var(--text-muted);
+}
+
+
+/* ---------------------------------------------------------------------
+   6. FORMATO Y CATEGORIA — píldoras
+   El color sale del id de catálogo (attr ref), no del texto.
+   --------------------------------------------------------------------- */
+lib|format,
+lib|category {
+  order: 3;
+  display: inline-block;
+  align-self: flex-start;
+  padding: .26rem .68rem;
+  border-radius: var(--radius-pill);
+  font-size: .74rem;
+  font-weight: 600;
+  letter-spacing: .015em;
+  white-space: nowrap;
+}
+
+lib|format            { color: var(--accent-text); background: var(--accent-soft); }
+lib|format[ref="1"]   { color: var(--fmt-1);       background: var(--fmt-1-soft); }
+lib|format[ref="2"]   { color: var(--fmt-2);       background: var(--fmt-2-soft); }
+lib|format[ref="3"]   { color: var(--fmt-3);       background: var(--fmt-3-soft); }
+lib|format[ref="4"]   { color: var(--fmt-4);       background: var(--fmt-4-soft); }
+
+lib|category {
+  color: var(--text-soft);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  font-weight: 500;
+}
+
+
+/* ---------------------------------------------------------------------
+   7. DATOS ESCALARES — rejilla de tres métricas
+   FD: ISBN -> año, precio, stock
+   --------------------------------------------------------------------- */
+lib|publicationYear,
+lib|price,
+lib|stock {
+  order: 5;
+  flex: 1 1 auto;
+  min-width: 78px;
+  display: block;
+  white-space: nowrap;
+  padding: .6rem .7rem .55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  font-family: var(--mono);
+  font-size: .98rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+
+lib|publicationYear::before,
+lib|price::before,
+lib|stock::before {
+  display: block;
+  margin-bottom: .12rem;
+  font-family: var(--sans);
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .085em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+lib|publicationYear::before { content: "Año"; }
+lib|price::before           { content: "Precio"; }
+lib|stock::before           { content: "Stock"; }
+
+/* La moneda vive en el atributo currency, no en el texto */
+lib|price {
+  flex-grow: 1.35;
+  color: var(--gold);
+}
+lib|price::after {
+  content: " " attr(currency);
+  font-size: .62rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+lib|stock { color: var(--text); }
+lib|stock::after {
+  content: " uds.";
+  font-size: .66rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+
+/* ---------------------------------------------------------------------
+   8. SECCIONES MULTIVALUADAS
+   Rótulo común generado desde el atributo count de cada envoltorio.
+   --------------------------------------------------------------------- */
+lib|genres,
+lib|concepts,
+lib|images {
+  order: 6;
+  flex: 1 0 100%;
+  display: block;
+  margin-top: .55rem;
+  padding-top: .8rem;
+  border-top: 1px solid var(--border);
+}
+lib|concepts { order: 7; }
+lib|images   { order: 8; }
+
+lib|genres::before,
+lib|concepts::before,
+lib|images::before {
+  display: block;
+  margin-bottom: .5rem;
+  font-size: .63rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+lib|genres::before   { content: "Géneros · "   attr(count); }
+lib|concepts::before { content: "Conceptos · " attr(count); }
+lib|images::before   { content: "Imágenes · "  attr(count); }
+
+/* Un libro sin conceptos (count="0") no dibuja la sección */
+lib|concepts[count="0"] { display: none; }
+
+/* Géneros — fichas delineadas (MVD libro ->> género) */
+lib|genres { line-height: 2.05; }
+lib|genre {
+  display: inline-block;
+  margin: 0 .3rem .3rem 0;
+  padding: .2rem .6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  font-size: .74rem;
+  font-weight: 500;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+
+/* ---------------------------------------------------------------------
+   9. CONCEPTOS — (libro, concepto) -> definición
+   La definición depende de la clave compuesta: se muestra dentro del
+   concepto del libro, nunca como dato del catálogo.
+   --------------------------------------------------------------------- */
+lib|concept {
+  display: block;
+  margin-bottom: .6rem;
+  padding-left: .8rem;
+  border-left: 2px solid var(--accent);
+}
+lib|concept:last-child { margin-bottom: 0; }
+
+lib|concept lib|name {
+  display: block;
+  margin-bottom: .12rem;
+  font-size: .82rem;
+  font-weight: 650;
+  letter-spacing: -.005em;
+  color: var(--text);
+}
+
+lib|concept lib|definition {
+  display: block;
+  font-size: .795rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+  text-wrap: pretty;
+}
+
+
+/* ---------------------------------------------------------------------
+   10. IMÁGENES
+   CSS no puede convertir el texto de <image> en un <img>; se presentan
+   como referencias monoespaciadas y la portada se marca con el atributo
+   isCover, que sí es alcanzable por selector.
+   --------------------------------------------------------------------- */
+lib|image {
+  display: block;
+  margin-bottom: .3rem;
+  padding: .38rem .55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  font-family: var(--mono);
+  font-size: .655rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+lib|image:last-child { margin-bottom: 0; }
+
+lib|image[isCover="true"] {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+lib|image[isCover="true"]::before {
+  content: "PORTADA";
+  display: inline-block;
+  margin-right: .45rem;
+  padding: .06rem .35rem;
+  border-radius: 4px;
+  background: var(--gold);
+  color: var(--surface);
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: .07em;
+  vertical-align: 1px;
+}
+
+
+/* ---------------------------------------------------------------------
+   11. IMPRESIÓN
+   --------------------------------------------------------------------- */
+@media print {
+  lib|library {
+    padding: 0;
+    background: #fff;
+    color: #000;
+  }
+  lib|books { grid-template-columns: repeat(2, 1fr); }
+  lib|book {
+    break-inside: avoid;
+    box-shadow: none;
+    border-color: #ccc;
+  }
+  lib|book:hover { transform: none; }
+}
+
+
+/* ---------------------------------------------------------------------
+   12. PANTALLAS ESTRECHAS
+   --------------------------------------------------------------------- */
+@media (max-width: 520px) {
+  lib|book  { padding: 1.25rem 1.1rem 1.1rem; }
+  lib|title { font-size: 1.22rem; }
+}
+
+
+/* =====================================================================
+   CAPA HTML — salida de library.xsl
+   ---------------------------------------------------------------------
+   Las secciones 1-12 estilizan el XML servido directamente al navegador
+   (library01.xml) mediante selectores de tipo con el prefijo lib|.
+
+   Esta capa estiliza el HTML que produce la transformacion XSLT de
+   library02.xml. Comparte los MISMOS tokens de la seccion 1: una sola
+   paleta, una sola tipografia, un solo lenguaje visual para las dos vias
+   de presentacion.
+
+   Se apoya en selectores de CLASE, que son independientes del espacio de
+   nombres, y en selectores de tipo sin prefijo (body, img, a), que
+   quedaron libres al declarar @namespace con prefijo en lugar de por
+   defecto.
+
+   Lo que aporta el XSLT y el CSS por si solo no podia hacer:
+     * <img> reales con las portadas (CSS no convierte texto en imagen)
+     * la marca "Agotado", porque XSLT si puede evaluar stock = 0
+     * totales calculados (ejemplares, valor del inventario, autores
+       distintos mediante agrupacion de Muench)
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   13. PAGINA
+   --------------------------------------------------------------------- */
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: clamp(1.5rem, 4vw, 4rem) clamp(1rem, 5vw, 4rem) 4rem;
+  background:
+    radial-gradient(1100px 520px at 12% -8%,  var(--accent-soft) 0%, transparent 62%),
+    radial-gradient(900px 460px at 92% 4%,    var(--gold-soft)   0%, transparent 58%),
+    linear-gradient(180deg, var(--bg-grad-a) 0%, var(--bg-grad-b) 46%, var(--bg) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1400px; margin: 0 auto; }
+
+img { max-width: 100%; display: block; }
+
+a { color: inherit; text-decoration: none; }
+a:focus-visible,
+.card:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+
+/* ---------------------------------------------------------------------
+   14. PORTADA DE LA PAGINA
+   --------------------------------------------------------------------- */
+.hero { margin-bottom: clamp(1.75rem, 3.5vw, 3rem); }
+
+.hero__eyebrow {
+  margin: 0 0 .7rem;
+  font-family: var(--mono);
+  font-size: .7rem;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.hero__title {
+  margin: 0 0 .4rem;
+  font-family: var(--serif);
+  font-size: clamp(2.1rem, 5.6vw, 3.6rem);
+  font-weight: 600;
+  letter-spacing: -.022em;
+  line-height: 1.05;
+}
+
+.hero__lead {
+  max-width: 62ch;
+  margin: 0 0 1.6rem;
+  font-size: 1rem;
+  color: var(--text-soft);
+  text-wrap: pretty;
+}
+
+/* Cifras agregadas, calculadas en la hoja XSLT */
+.hero__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: .7rem;
+  margin: 0;
+}
+
+.stat {
+  padding: .85rem 1rem .8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.stat dt {
+  margin-bottom: .2rem;
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .085em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.stat dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 1.28rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+
+.stat__unit {
+  font-size: .64rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.stat--accent dd { color: var(--accent-text); }
+.stat--gold   dd { color: var(--gold); }
+.stat--alert  dd { color: var(--danger); }
+
+
+/* ---------------------------------------------------------------------
+   15. REJILLA Y TARJETA
+   --------------------------------------------------------------------- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
+  gap: clamp(1rem, 1.8vw, 1.6rem);
+  align-items: start;
+}
+
+.card {
+  --rule: var(--accent);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+
+/* Filete superior teñido por el formato. Va en un pseudo-elemento por
+   encima del contenido: como fondo de .card quedaria oculto bajo el
+   fondo propio de la portada, que empieza en el borde de la tarjeta. */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 1;
+  height: 3px;
+  background: linear-gradient(90deg, var(--rule), transparent 88%);
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-hover);
+}
+
+/* El filete se tiñe con el id de catalogo del formato (attr ref del XML,
+   trasladado a data-format por la hoja XSLT). */
+.card[data-format="1"] { --rule: var(--fmt-1); }
+.card[data-format="2"] { --rule: var(--fmt-2); }
+.card[data-format="3"] { --rule: var(--fmt-3); }
+.card[data-format="4"] { --rule: var(--fmt-4); }
+
+
+/* ---------------------------------------------------------------------
+   16. PORTADA DEL LIBRO
+   object-fit: contain conserva la ilustracion completa; las portadas de
+   Open Library no comparten proporcion.
+   --------------------------------------------------------------------- */
+.cover {
+  position: relative;
+  margin: 0;
+  padding: 1.4rem 1.4rem .2rem;
+  background: linear-gradient(180deg, var(--surface-soft), transparent);
+}
+
+.cover__img {
+  width: 100%;
+  height: 210px;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 20px rgba(16, 24, 40, .22));
+  transition: transform .3s ease;
+}
+
+.card:hover .cover__img { transform: translateY(-2px) scale(1.02); }
+
+/* Marca de agotado: solo la emite el XSLT cuando stock = 0 */
+.cover__flag {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  padding: .22rem .55rem;
+  border-radius: var(--radius-pill);
+  background: var(--flag-bg);
+  color: var(--flag-fg);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+
+/* ---------------------------------------------------------------------
+   17. CUERPO DE LA TARJETA
+   --------------------------------------------------------------------- */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+  padding: 1.15rem 1.4rem 1.35rem;
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: .68rem;
+  font-weight: 500;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.book-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.34rem;
+  font-weight: 600;
+  line-height: 1.24;
+  letter-spacing: -.012em;
+  text-wrap: balance;
+}
+
+.byline {
+  margin: 0 0 .2rem;
+  font-size: .875rem;
+  color: var(--text-soft);
+}
+.byline em { font-style: italic; color: var(--text-muted); }
+
+/* Pildoras de formato y categoria ---------------------------------- */
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pill {
+  padding: .26rem .68rem;
+  border-radius: var(--radius-pill);
+  font-size: .74rem;
+  font-weight: 600;
+  letter-spacing: .015em;
+  white-space: nowrap;
+}
+
+.pill--format                    { color: var(--accent-text); background: var(--accent-soft); }
+.pill--format[data-ref="1"]      { color: var(--fmt-1);       background: var(--fmt-1-soft); }
+.pill--format[data-ref="2"]      { color: var(--fmt-2);       background: var(--fmt-2-soft); }
+.pill--format[data-ref="3"]      { color: var(--fmt-3);       background: var(--fmt-3-soft); }
+.pill--format[data-ref="4"]      { color: var(--fmt-4);       background: var(--fmt-4-soft); }
+
+.pill--category {
+  color: var(--text-soft);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  font-weight: 500;
+}
+
+/* Metricas escalares ------------------------------------------------ */
+.metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin: .15rem 0 0;
+}
+
+.metric {
+  flex: 1 1 auto;
+  min-width: 78px;
+  padding: .6rem .7rem .55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  white-space: nowrap;
+}
+.metric--price { flex-grow: 1.35; }
+
+.metric dt {
+  margin-bottom: .12rem;
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .085em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.metric dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: .98rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+
+.metric__unit {
+  font-size: .62rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.metric--price dd { color: var(--gold); }
+/* XSLT marca el agotado: CSS no puede evaluar el texto del elemento */
+.metric--out dd   { color: var(--danger); }
+
+
+/* ---------------------------------------------------------------------
+   18. SECCIONES MULTIVALUADAS
+   --------------------------------------------------------------------- */
+.section {
+  margin-top: .35rem;
+  padding-top: .8rem;
+  border-top: 1px solid var(--border);
+}
+
+.section__label {
+  margin: 0 0 .5rem;
+  font-size: .63rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Generos */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  padding: .2rem .6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  font-size: .74rem;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+/* Conceptos: (libro, concepto) -> definicion */
+.concepts { margin: 0; }
+
+.concepts dt {
+  margin-bottom: .12rem;
+  padding-left: .8rem;
+  border-left: 2px solid var(--accent);
+  font-size: .82rem;
+  font-weight: 650;
+}
+
+.concepts dd {
+  margin: 0 0 .6rem;
+  padding-left: .8rem;
+  border-left: 2px solid var(--accent);
+  font-size: .795rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+  text-wrap: pretty;
+}
+.concepts dd:last-child { margin-bottom: 0; }
+
+/* Imagenes adicionales (las que no son portada) */
+.thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.thumbs img {
+  width: 58px;
+  height: 78px;
+  object-fit: contain;
+  padding: .25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  transition: border-color .2s ease, transform .2s ease;
+}
+.thumbs a:hover img {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+
+/* ---------------------------------------------------------------------
+   19. PIE
+   --------------------------------------------------------------------- */
+.foot {
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: .72rem;
+  color: var(--text-muted);
+}
+.foot p { margin: 0 0 .3rem; }
+
+
+/* ---------------------------------------------------------------------
+   20. IMPRESION Y PANTALLAS ESTRECHAS (capa HTML)
+   --------------------------------------------------------------------- */
+@media print {
+  body { padding: 0; background: #fff; color: #000; }
+  .grid { grid-template-columns: repeat(2, 1fr); }
+  .card { break-inside: avoid; box-shadow: none; border-color: #ccc; }
+  .card:hover { transform: none; }
+  .hero__stats { break-inside: avoid; }
+}
+
+@media (max-width: 520px) {
+  .cover      { padding: 1.1rem 1.1rem .2rem; }
+  .body       { padding: 1rem 1.1rem 1.2rem; }
+  .book-title { font-size: 1.22rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .cover__img, .thumbs img { transition: none; }
+  .card:hover { transform: none; }
+  .card:hover .cover__img { transform: none; }
+}

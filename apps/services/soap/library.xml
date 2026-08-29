@@ -1,0 +1,488 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  =====================================================================
+  library/apps/services/soap/library.xml
+
+  Book-oriented XML catalog of the online library.
+
+  Source of truth:
+      data/schema.sql   (structure, PostgreSQL schema "library")
+      data/seed.sql     (initial data)
+
+  Design notes
+  * The document is BOOK-ORIENTED: <book> is the aggregate root and every
+    piece of information hangs from the book it belongs to. Consumers of
+    the SOAP service can therefore return a single <book> element as a
+    complete, self-contained payload without extra joins.
+
+  * The relational model is flattened into the book element following the
+    functional dependencies documented in data/schema.sql:
+
+      ISBN -> title, publicationYear, price, stock, format, category
+          => plain child elements / attributes of <book>
+
+      book ->> author            (multivalued dependency)
+      book ->> genre             (multivalued dependency)
+      book ->> image             (multivalued dependency)
+      book ->> (concept, definition)
+          => repeating wrapper elements <authors>, <genres>, <images>,
+             <concepts>, so no MVD is ever collapsed into a delimited
+             string.
+
+  * (book, concept) -> definition is a dependency over the composite key:
+    the same concept may carry a different definition in a different
+    book, so <definition> lives inside <concept>, never inside the
+    catalog entry.
+
+  * Catalog entities (format, category, genre, author, concept) keep
+    their database id in a "ref" attribute so the XML can be mapped back
+    to the normalized tables without matching by name.
+
+  * Element and attribute names are in English. Data values are
+    reproduced verbatim as stored in the database.
+  =====================================================================
+-->
+<library xmlns="urn:library:catalog:1.0"
+         version="1.0"
+         generatedAt="2026-08-28T00:00:00Z"
+         source="library_db"
+         schema="library">
+
+  <books count="13">
+
+    <!-- ============================================================= -->
+    <book id="1" isbn="978-0133970777">
+      <title>Fundamentos de Sistemas de Bases de Datos</title>
+      <publicationYear>2016</publicationYear>
+      <price currency="MXN">1250.00</price>
+      <stock>12</stock>
+      <format ref="4">Pasta dura</format>
+      <category ref="5">Academico</category>
+
+      <authors count="2">
+        <author ref="1">Ramez Elmasri</author>
+        <author ref="2">Shamkant Navathe</author>
+      </authors>
+
+      <genres count="2">
+        <genre ref="1">Bases de datos</genre>
+        <genre ref="2">Ingenieria de software</genre>
+      </genres>
+
+      <concepts count="4">
+        <concept ref="1">
+          <name>Normalizacion</name>
+          <definition>Proceso de descomposicion de relaciones para eliminar redundancia y anomalias de actualizacion, aplicando 1FN a 5FN.</definition>
+        </concept>
+        <concept ref="2">
+          <name>Dependencia funcional</name>
+          <definition>Restriccion X -&gt; Y que indica que el valor de X determina de forma unica el valor de Y en toda la relacion.</definition>
+        </concept>
+        <concept ref="3">
+          <name>Dependencia multivaluada</name>
+          <definition>Restriccion X -&gt;&gt; Y presente cuando un atributo determina un conjunto de valores independiente del resto de atributos; se resuelve en 4FN.</definition>
+        </concept>
+        <concept ref="4">
+          <name>Transaccion</name>
+          <definition>Unidad logica de trabajo que cumple las propiedades ACID: atomicidad, consistencia, aislamiento y durabilidad.</definition>
+        </concept>
+      </concepts>
+
+      <images count="2">
+        <image id="1" isCover="true">https://covers.openlibrary.org/b/isbn/9780133970777-L.jpg</image>
+        <image id="2" isCover="false">https://covers.openlibrary.org/b/isbn/9780133970777-M.jpg</image>
+      </images>
+    </book>
+
+    <!-- ============================================================= -->
+    <book id="2" isbn="978-0134757599">
+      <title>Refactoring: Improving the Design of Existing Code</title>
+      <publicationYear>2018</publicationYear>
+      <price currency="MXN">980.50</price>
+      <stock>7</stock>
+      <format ref="1">Fisico</format>
+      <category ref="1">Tecnico</category>
+
+      <authors count="2">
+        <author ref="3">Martin Fowler</author>
+        <author ref="4">Kent Beck</author>
+      </authors>
+
+      <genres count="1">
+        <genre ref="2">Ingenieria de software</genre>
+      </genres>
+
+      <concepts count="3">
+        <concept ref="5">
+          <name>Refactorizacion</name>
+          <definition>Cambio en la estructura interna del codigo que no altera su comportamiento observable y mejora su diseno.</definition>
+        </concept>
+        <concept ref="6">
+          <name>Deuda tecnica</name>
+          <definition>Costo futuro acumulado por decisiones de diseno que priorizan la entrega inmediata sobre la calidad del codigo.</definition>
+        </concept>
+        <concept ref="1">
+          <name>Normalizacion</name>
+          <definition>En el contexto del codigo, dar forma uniforme a estructuras duplicadas para poder extraerlas a una sola abstraccion.</definition>
+        </concept>
+      </concepts>
+
+      <images count="1">
+        <image id="3" isCover="true">https://covers.openlibrary.org/b/isbn/9780134757599-L.jpg</image>
+      </images>
+    </book>
+
+    <!-- ============================================================= -->
+    <book id="3" isbn="978-0553293357">
+      <title>Fundacion</title>
+      <publicationYear>1951</publicationYear>
+      <price currency="MXN">320.00</price>
+      <stock>25</stock>
+      <format ref="2">Digital</format>
+      <category ref="2">Ficcion</category>
+
+      <authors count="1">
+        <author ref="5">Isaac Asimov</author>
+      </authors>
+
+      <genres count="2">
+        <genre ref="3">Ciencia ficcion</genre>
+        <genre ref="4">Novela</genre>
+      </genres>
+
+      <concepts count="1">
+        <concept ref="7">
+          <name>Robotica</name>
+          <definition>Disciplina que estudia maquinas autonomas; en la obra se rige por las tres leyes formuladas por el autor.</definition>
+        </concept>
+      </concepts>
+
+      <images count="1">
+        <image id="4" isCover="true">https://covers.openlibrary.org/b/isbn/9780553293357-L.jpg</image>
+      </images>
+    </book>
+
+    <!-- ============================================================= -->
+    <book id="4" isbn="978-0307474728">
+      <title>Cien Anos de Soledad</title>
+      <publicationYear>1967</publicationYear>
+      <price currency="MXN">410.00</price>
+      <stock>0</stock>
+      <format ref="1">Fisico</format>
+      <category ref="2">Ficcion</category>
+
+      <authors count="1">
+        <author ref="6">Gabriel Garcia Marquez</author>
+      </authors>
+
+      <genres count="1">
+        <genre ref="4">Novela</genre>
+      </genres>
+
+      <concepts count="1">
+        <concept ref="13">
+          <name>Realismo magico</name>
+          <definition>Narrativa que presenta lo extraordinario como parte natural de la vida cotidiana, sin que los personajes lo cuestionen.</definition>
+        </concept>
+      </concepts>
+
+      <images count="2">
+        <image id="5" isCover="true">https://covers.openlibrary.org/b/isbn/9780307474728-L.jpg</image>
+        <image id="6" isCover="false">https://covers.openlibrary.org/b/isbn/9780307474728-M.jpg</image>
+      </images>
+    </book>
+
+    <!-- ============================================================= -->
+    <book id="5" isbn="978-0201896831">
+      <title>The Art of Computer Programming, Vol. 1</title>
+      <publicationYear>1997</publicationYear>
+      <price currency="MXN">2100.00</price>
+      <stock>3</stock>
+      <format ref="4">Pasta dura</format>
+      <category ref="5">Academico</category>
+
+      <authors count="1">
+        <author ref="7">Donald Knuth</author>
+      </authors>
+
+      <genres count="2">
+        <genre ref="7">Matematicas</genre>
+        <genre ref="8">Algoritmos</genre>
+      </genres>
+
+      <concepts count="1">
+        <concept ref="9">
+          <name>Complejidad algoritmica</name>
+          <definition>Analisis exacto del numero de operaciones elementales de un algoritmo, con constantes y no solo con notacion asintotica.</definition>
+        </concept>
+      </concepts>
+
+      <images count="1">
+        <image id="7" isCover="true">https://covers.openlibrary.org/b/isbn/9780201896831-L.jpg</image>
+      </images>
+    </book>
+
+    <!-- ============================================================= -->
+    <book id="6" isbn="978-0132350884">
+      <title>Clean Code: A Handbook of Agile Software Craftsmanship</title>
+      <publicationYear>2008</publicationYear>
+      <price currency="MXN">890.00</price>
+      <stock>15</stock>
+      <format ref="1">Fisico</format>
+      <category ref="1">Tecnico</category>
+
+      <authors count="1">
+        <author ref="8">Robert C. Martin</author>
+      </authors>
+
+      <genres count="1">
+        <genre ref="2">Ingenieria de software</genre>
+      </genres>
+
+      <concepts count="3">
+        <concept ref="10">
+          <name>Codigo limpio</name>
+          <definition>Codigo que se lee como prosa: nombres reveladores, funciones cortas con un solo proposito y ausencia de duplicacion.</definition>
+        </concept>
+        <concept ref="5">
+          <name>Refactorizacion</name>
+          <definition>Regla del boy scout: dejar cada modulo un poco mas limpio de como se encontro, en pequenos pasos continuos.</definition>
+        </concept>
+        <concept ref="6">
+          <name>Deuda tecnica</name>
+          <definition>Desorden acumulado que reduce la velocidad del equipo hasta que reescribir parece mas barato que mantener.</definition>
+        </concept>
+      </concepts>
+
+      <images count="1">
+        <image id="8" isCover="true">https://covers.openlibrary.org/b/isbn/9780132350884-L.jpg</image>
+      </images>
+    </book>
+
+    <!-- ============================================================= -->
+    <book id="7" isbn="978-0134494166">
+      <title>Clean Architecture: A Craftsman's Guide to Software Structure</title>
+      <publicationYear>2017</publicationYear>
+      <price currency="MXN">760.00</price>
+      <stock>9</stock>
+      <format ref="2">Digital</format>
+      <category ref="1">Tecnico</category>
+
+      <authors count="1">
+        <author ref="8">Robert C. Martin</author>
+      </authors>
+
+      <genres count="2">
+        <genre ref="2">Ingenieria de software</genre>
+        <genre ref="9">Arquitectura de software</genre>
+      </genres>
+
+      <concepts count="3">
+        <concept ref="12">
+          <name>Arquitectura limpia</name>
+          <definition>Organizacion en capas concentricas donde las reglas de negocio no dependen de la interfaz, la base de datos ni los frameworks.</definition>
+        </concept>
+        <concept ref="11">
+          <name>Principio SOLID</name>
+          <definition>Cinco principios de diseno orientado a objetos: responsabilidad unica, abierto/cerrado, sustitucion de Liskov, segregacion de interfaces e inversion de dependencias.</definition>
+        </concept>
+        <concept ref="8">
+          <name>Patron de diseno</name>
+          <definition>Frontera arquitectonica que aisla los detalles tecnicos mediante interfaces controladas por la capa de negocio.</definition>
+        </concept>
+      </concepts>
+
+      <images count="1">
+        <image id="9" isCover="true">https://covers.openlibrary.org/b/isbn/9780134494166-L.jpg</image>
+      </images>
+    </book>
+
+    <!-- ============================================================= -->
+    <book id="8" isbn="978-0201633610">
+      <title>Design Patterns: Elements of Reusable Object-Oriented Software</title>
+      <publicationYear>1994</publicationYear>
+      <price currency="MXN">1180.00</price>
+      <stock>6</stock>
+      <format ref="4">Pasta dura</format>
+      <category ref="5">Academico</category>
+
+      <authors count="4">
+        <author ref="9">Erich Gamma</author>
+        <author ref="10">Richard Helm</author>
+        <author ref="11">Ralph Johnson</author>
+        <author ref="12">John Vlissides</author>
+      </authors>
+
+      <genres count="2">
+        <genre ref="2">Ingenieria de software</genre>
+        <genre ref="9">Arquitectura de software</genre>
+      </genres>
+
+      <concepts count="2">
+        <concept ref="8">
+          <name>Patron de diseno</name>
+          <definition>Solucion reutilizable a un problema recurrente de diseno, descrita por su contexto, su estructura y sus consecuencias.</definition>
+        </concept>
+        <concept ref="11">
+          <name>Principio SOLID</name>
+          <definition>Programar contra interfaces y favorecer la composicion sobre la herencia, base conceptual de los patrones del catalogo.</definition>
+        </concept>
+      </concepts>
+
+      <images count="1">
+        <image id="10" isCover="true">https://covers.openlibrary.org/b/isbn/9780201633610-L.jpg</image>
+      </images>
+    </book>
+
+    <!-- ============================================================= -->
+    <book id="9" isbn="978-0262033848">
+      <title>Introduction to Algorithms</title>
+      <publicationYear>2009</publicationYear>
+      <price currency="MXN">1990.00</price>
+      <stock>4</stock>
+      <format ref="4">Pasta dura</format>
+      <category ref="5">Academico</category>
+
+      <authors count="4">
+        <author ref="13">Thomas H. Cormen</author>
+        <author ref="14">Charles E. Leiserson</author>
+        <author ref="15">Ronald L. Rivest</author>
+        <author ref="16">Clifford Stein</author>
+      </authors>
+
+      <genres count="2">
+        <genre ref="8">Algoritmos</genre>
+        <genre ref="7">Matematicas</genre>
+      </genres>
+
+      <concepts count="1">
+        <concept ref="9">
+          <name>Complejidad algoritmica</name>
+          <definition>Medida asintotica del crecimiento del tiempo o el espacio que consume un algoritmo en funcion del tamano de la entrada.</definition>
+        </concept>
+      </concepts>
+
+      <images count="1">
+        <image id="11" isCover="true">https://covers.openlibrary.org/b/isbn/9780262033848-L.jpg</image>
+      </images>
+    </book>
+
+    <!-- ============================================================= -->
+    <book id="10" isbn="978-0062316097">
+      <title>Sapiens: De Animales a Dioses</title>
+      <publicationYear>2014</publicationYear>
+      <price currency="MXN">540.00</price>
+      <stock>20</stock>
+      <format ref="2">Digital</format>
+      <category ref="4">Divulgacion</category>
+
+      <authors count="1">
+        <author ref="17">Yuval Noah Harari</author>
+      </authors>
+
+      <genres count="2">
+        <genre ref="6">Historia</genre>
+        <genre ref="5">Ensayo</genre>
+      </genres>
+
+      <concepts count="1">
+        <concept ref="16">
+          <name>Revolucion cognitiva</name>
+          <definition>Aparicion del lenguaje ficcional hace unos 70,000 anos, que permitio a Homo sapiens cooperar en grupos muy grandes.</definition>
+        </concept>
+      </concepts>
+
+      <images count="1">
+        <image id="12" isCover="true">https://covers.openlibrary.org/b/isbn/9780062316097-L.jpg</image>
+      </images>
+    </book>
+
+    <!-- ============================================================= -->
+    <book id="11" isbn="978-0553380163">
+      <title>Breve Historia del Tiempo</title>
+      <publicationYear>1988</publicationYear>
+      <price currency="MXN">380.00</price>
+      <stock>11</stock>
+      <format ref="3">Audiolibro</format>
+      <category ref="4">Divulgacion</category>
+
+      <authors count="1">
+        <author ref="20">Stephen Hawking</author>
+      </authors>
+
+      <genres count="2">
+        <genre ref="10">Divulgacion cientifica</genre>
+        <genre ref="11">Fisica</genre>
+      </genres>
+
+      <concepts count="1">
+        <concept ref="14">
+          <name>Agujero negro</name>
+          <definition>Region del espacio-tiempo con una curvatura tal que nada, ni siquiera la luz, puede escapar de su horizonte de sucesos.</definition>
+        </concept>
+      </concepts>
+
+      <images count="1">
+        <image id="13" isCover="true">https://covers.openlibrary.org/b/isbn/9780553380163-L.jpg</image>
+      </images>
+    </book>
+
+    <!-- ============================================================= -->
+    <book id="12" isbn="978-0441013593">
+      <title>Dune</title>
+      <publicationYear>1965</publicationYear>
+      <price currency="MXN">450.00</price>
+      <stock>18</stock>
+      <format ref="1">Fisico</format>
+      <category ref="2">Ficcion</category>
+
+      <authors count="1">
+        <author ref="18">Frank Herbert</author>
+      </authors>
+
+      <genres count="2">
+        <genre ref="3">Ciencia ficcion</genre>
+        <genre ref="4">Novela</genre>
+      </genres>
+
+      <concepts count="1">
+        <concept ref="15">
+          <name>Ecologia planetaria</name>
+          <definition>Estudio del equilibrio entre especie, agua y clima de un planeta; en Arrakis define la economia, la religion y la politica.</definition>
+        </concept>
+      </concepts>
+
+      <images count="2">
+        <image id="14" isCover="true">https://covers.openlibrary.org/b/isbn/9780441013593-L.jpg</image>
+        <image id="15" isCover="false">https://covers.openlibrary.org/b/isbn/9780441013593-M.jpg</image>
+      </images>
+    </book>
+
+    <!-- ============================================================= -->
+    <book id="13" isbn="978-0156012195">
+      <title>El Principito</title>
+      <publicationYear>1943</publicationYear>
+      <price currency="MXN">210.00</price>
+      <stock>30</stock>
+      <format ref="4">Pasta dura</format>
+      <category ref="3">Infantil</category>
+
+      <authors count="1">
+        <author ref="19">Antoine de Saint-Exupery</author>
+      </authors>
+
+      <genres count="2">
+        <genre ref="12">Literatura infantil</genre>
+        <genre ref="4">Novela</genre>
+      </genres>
+
+      <!-- This book has no rows in book_concepts. -->
+      <concepts count="0"/>
+
+      <images count="1">
+        <image id="16" isCover="true">https://covers.openlibrary.org/b/isbn/9780156012195-L.jpg</image>
+      </images>
+    </book>
+
+  </books>
+</library>

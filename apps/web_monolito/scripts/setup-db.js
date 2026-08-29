@@ -17,7 +17,7 @@ const db = require('../src/config/database');
 const password = require('../src/core/utils/password');
 
 const SCHEMA_FILE = path.resolve(__dirname, '..', '..', '..', 'data', 'schema.sql');
-const SEED_FILE = path.resolve(__dirname, '..', 'db', 'seed.sql');
+const SEED_FILE = path.resolve(__dirname, '..', '..', '..', 'data', 'seed.sql');
 
 const args = process.argv.slice(2);
 const has = (flag) => args.includes(flag);
@@ -55,20 +55,29 @@ async function applySeed() {
     log('Datos de demostracion omitidos (--no-demo).');
     return;
   }
+  if (!fs.existsSync(SEED_FILE)) {
+    throw new Error(`No se encontro el archivo de datos: ${SEED_FILE}`);
+  }
   log(`Cargando datos de demostracion desde ${SEED_FILE}...`);
   await db.query(fs.readFileSync(SEED_FILE, 'utf8'));
   log('Datos de demostracion cargados.');
 }
 
 async function ensureAdmin() {
-  const existing = await db.one("SELECT id, email FROM users WHERE role = 'admin'");
+  // Tabla calificada con el esquema: este script tambien se ejecuta contra
+  // bases en la nube detras de un pooler (PgBouncer en modo transaction),
+  // donde el parametro de arranque "options -c search_path=..." del pool no
+  // siempre llega y las referencias sin calificar fallan.
+  const usersTable = `${config.db.schema}.users`;
+
+  const existing = await db.one(`SELECT id, email FROM ${usersTable} WHERE role = 'admin'`);
   if (existing) {
     log(`Ya existe un administrador (${existing.email}); no se crea otro.`);
     return;
   }
   const hash = await password.hash(config.admin.password);
   await db.query(
-    `INSERT INTO users (full_name, email, password_hash, role)
+    `INSERT INTO ${usersTable} (full_name, email, password_hash, role)
      VALUES ($1, $2, $3, 'admin')`,
     [config.admin.name, config.admin.email, hash]
   );
@@ -80,7 +89,9 @@ async function ensureAdmin() {
   try {
     log(`Conectando a ${config.db.database}@${config.db.host}:${config.db.port} como ${config.db.user}...`);
     if (!has('--seed-only')) await applySchema();
-    await db.query(`SET search_path TO ${config.db.schema}, public`);
+    // No se fija search_path aqui: el pool entrega una conexion cualquiera y
+    // el ajuste no alcanzaria a las consultas siguientes. Tanto data/seed.sql
+    // como ensureAdmin() califican sus tablas con el esquema.
     await applySeed();
     await ensureAdmin();
     log('Instalacion completada.');

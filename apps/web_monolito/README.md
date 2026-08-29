@@ -54,7 +54,7 @@ El esquema completo esta en `data/schema.sql` (raiz del proyecto).
 ```
 apps/web_monolito/
 ├── server.js                  Punto de entrada del monolito
-├── db/seed.sql                Datos de demostracion (idempotente)
+(los datos de demostracion viven en data/seed.sql, en la raiz)
 ├── scripts/setup-db.js        Instalador: esquema + datos + administrador
 └── src/
     ├── app.js                 Composicion de Express (vistas, sesion, rutas)
@@ -277,8 +277,16 @@ sudo -u library npm run db:setup
 El script:
 
 1. aplica `data/schema.sql` si el esquema `library` todavia no existe;
-2. carga los datos de demostracion de `db/seed.sql`;
+2. carga los datos de demostracion de `data/seed.sql`;
 3. crea el **unico** administrador con la contrasena cifrada con bcrypt.
+
+`data/seed.sql` es el unico archivo con `INSERT` (busque la marca
+`>>> INICIO DE LOS INSERTS <<<`); `data/schema.sql` solo contiene la
+estructura. Los datos que carga son: 4 formatos, 5 categorias, 12 generos,
+20 autores, 16 conceptos, 13 libros con sus autores, generos, definiciones
+e imagenes de portada, y 5 usuarios de demostracion con rol `user`
+(contrasena `Demo123!` para todos; `Maria Luna` queda inactiva para probar
+el bloqueo de acceso). Elimine esas cuentas antes de un uso real.
 
 Variantes:
 
@@ -292,7 +300,7 @@ Alternativa manual con `psql`:
 
 ```bash
 psql "postgresql://library_user:777@localhost:5432/library_db" -f /opt/library/app/data/schema.sql
-psql "postgresql://library_user:777@localhost:5432/library_db" -f /opt/library/app/apps/web_monolito/db/seed.sql
+psql "postgresql://library_user:777@localhost:5432/library_db" -f /opt/library/app/data/seed.sql
 # El administrador debe crearse con el script, para que la contrasena quede cifrada:
 sudo -u library node scripts/setup-db.js --seed-only
 ```
@@ -472,4 +480,6 @@ npm run dev                   # http://localhost:3000
 ```
 
 Credenciales iniciales: las que indique `.env` (por omision
-`admin@library.local` / `Admin123!`).
+`admin@library.local` / `Admin123!`). Los usuarios de demostracion que
+carga `data/seed.sql` usan la contrasena `Demo123!` (por ejemplo
+`laura.mendez@example.com`).

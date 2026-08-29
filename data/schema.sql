@@ -158,3 +158,19 @@ CREATE TRIGGER trg_books_updated_at
 CREATE TRIGGER trg_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- =====================================================================
+-- DATOS INICIALES (INSERTS)
+-- ---------------------------------------------------------------------
+-- Este archivo contiene unicamente la ESTRUCTURA (DDL). Los INSERT con
+-- los datos iniciales de la aplicacion estan en un archivo aparte:
+--
+--     data/seed.sql
+--
+-- (busque en el la marca ">>> INICIO DE LOS INSERTS <<<")
+--
+-- Se mantienen separados para poder recargar los datos sin recrear el
+-- esquema. Carga:
+--     npm run db:setup   -> esquema + datos + administrador
+--     npm run db:seed    -> solo datos + administrador
+-- =====================================================================
