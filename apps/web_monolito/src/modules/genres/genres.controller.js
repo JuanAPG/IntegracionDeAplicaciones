@@ -2,9 +2,10 @@
 
 const lookupController = require('../../core/crud/lookupController');
 const model = require('./genres.model');
+const config = require('../../config/env');
 
 const meta = {
-  basePath: '/admin/genres',
+  basePath: `${config.basePath}/admin/genres`,
   title: 'Generos',
   singular: 'genero',
   nameLabel: 'Nombre del genero',

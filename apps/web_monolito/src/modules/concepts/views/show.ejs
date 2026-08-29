@@ -20,7 +20,7 @@
   <% definitions.forEach(function (d) { %>
     <div class="concept" data-reveal>
       <p class="concept-name">
-        <a href="/admin/books/<%= d.book_id %>/edit"><%= d.title %></a>
+        <a href="<%= base %>/admin/books/<%= d.book_id %>/edit"><%= d.title %></a>
         <span class="badge mono">ISBN <%= d.isbn %></span>
       </p>
       <p class="concept-def"><%= d.definition %></p>

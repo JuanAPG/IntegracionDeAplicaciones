@@ -2,9 +2,10 @@
 
 const lookupController = require('../../core/crud/lookupController');
 const model = require('./authors.model');
+const config = require('../../config/env');
 
 const meta = {
-  basePath: '/admin/authors',
+  basePath: `${config.basePath}/admin/authors`,
   title: 'Autores',
   singular: 'autor',
   nameLabel: 'Nombre del autor',

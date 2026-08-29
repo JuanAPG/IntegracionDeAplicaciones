@@ -6,7 +6,7 @@
     El sistema admite un solo administrador.
   </p>
 
-  <form action="/auth/register" method="POST" class="mt-5">
+  <form action="<%= base %>/auth/register" method="POST" class="mt-5">
     <div class="field">
       <label for="full_name">Nombre completo</label>
       <input type="text" id="full_name" name="full_name" required maxlength="150" autofocus autocomplete="name" placeholder="Ana Ruiz">
@@ -28,7 +28,7 @@
     </div>
     <div class="form-actions">
       <button class="btn btn-primary" type="submit">Registrarme</button>
-      <a href="/auth/login">Ya tengo cuenta</a>
+      <a href="<%= base %>/auth/login">Ya tengo cuenta</a>
     </div>
   </form>
 </div>

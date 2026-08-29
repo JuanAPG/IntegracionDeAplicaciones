@@ -13,7 +13,7 @@ const concepts = require('../concepts/concepts.model');
 const formats = require('../formats/formats.model');
 const categories = require('../categories/categories.model');
 
-const BASE = '/admin/books';
+const BASE = `${config.basePath}/admin/books`;
 
 /** Convierte un texto "A, B, C" en ids, creando los registros que no existan. */
 const resolveNames = async (rawText, lookup) => {

@@ -3,9 +3,10 @@
 const lookupController = require('../../core/crud/lookupController');
 const asyncHandler = require('../../core/utils/asyncHandler');
 const model = require('./concepts.model');
+const config = require('../../config/env');
 
 const meta = {
-  basePath: '/admin/concepts',
+  basePath: `${config.basePath}/admin/concepts`,
   title: 'Conceptos',
   singular: 'concepto',
   nameLabel: 'Nombre del concepto',

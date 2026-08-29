@@ -7,7 +7,7 @@ const { str, requiredStr, isEmail } = require('../../core/utils/validate');
 const config = require('../../config/env');
 const model = require('./users.model');
 
-const BASE = '/admin/users';
+const BASE = `${config.basePath}/admin/users`;
 
 const index = asyncHandler(async (req, res) => {
   const search = str(req.query.q);

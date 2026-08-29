@@ -2,9 +2,10 @@
 
 const lookupController = require('../../core/crud/lookupController');
 const model = require('./categories.model');
+const config = require('../../config/env');
 
 const meta = {
-  basePath: '/admin/categories',
+  basePath: `${config.basePath}/admin/categories`,
   title: 'Categorias',
   singular: 'categoria',
   nameLabel: 'Nombre de la categoria',

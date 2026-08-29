@@ -402,8 +402,9 @@ sudo firewall-cmd --reload
 ## 6.11 Verificacion
 
 ```bash
-curl -I http://localhost:3000/            # HTTP/1.1 200 OK
-curl -s http://localhost:3000/ | head     # HTML renderizado en el servidor
+curl -I http://localhost:3000/library     # HTTP/1.1 200 OK
+curl -I http://localhost:3000/            # 302 -> /library
+curl -s http://localhost:3000/library | head   # HTML renderizado en el servidor
 ```
 
 Desde el navegador: `http://<ip-del-servidor>/`
@@ -476,10 +477,31 @@ cd apps/web_monolito
 npm install
 cp .env.example .env          # ajuste PGUSER, PGPASSWORD, PGDATABASE
 npm run db:setup              # esquema + datos de demostracion + administrador
-npm run dev                   # http://localhost:3000
+npm run dev                   # http://localhost:3000/library
 ```
 
 Credenciales iniciales: las que indique `.env` (por omision
 `admin@library.local` / `Admin123!`). Los usuarios de demostracion que
 carga `data/seed.sql` usan la contrasena `Demo123!` (por ejemplo
 `laura.mendez@example.com`).
+
+
+## Ruta de inicio y puerto
+
+La aplicacion se monta completa bajo un prefijo, definido en un unico lugar
+(`src/config/env.js` -> `basePath`):
+
+| Variable    | Valor por defecto | Efecto                                        |
+|-------------|-------------------|-----------------------------------------------|
+| `PORT`      | `3000`            | Puerto de escucha                             |
+| `BASE_PATH` | `/library`        | Prefijo de montaje; la portada es `/library`  |
+
+* Inicio: `http://localhost:3000/library`
+* `http://localhost:3000/` responde 302 hacia `/library`.
+* `BASE_PATH=/` monta la aplicacion en la raiz, sin prefijo.
+
+Las vistas nunca escriben el prefijo a mano: reciben `base` en `res.locals` y
+lo anteponen (`href="<%= base %>/catalog"`). Las imagenes pasan por el helper
+`asset()`, que prefija las rutas propias (`/uploads/...`) y deja intactas las
+URL externas. El JS de cliente deriva sus rutas de `import.meta.url`, asi que
+tampoco necesita conocer el prefijo.

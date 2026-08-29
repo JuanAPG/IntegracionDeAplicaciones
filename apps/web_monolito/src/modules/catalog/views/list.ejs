@@ -5,12 +5,12 @@
     <p class="lead"><%= total %> libro<%= total === 1 ? '' : 's' %> disponible<%= total === 1 ? '' : 's' %>.</p>
   </div>
   <% if (isAdmin) { %>
-    <a class="btn btn-secondary" href="/admin/books">Administrar libros</a>
+    <a class="btn btn-secondary" href="<%= base %>/admin/books">Administrar libros</a>
   <% } %>
 </div>
 
 <div class="card">
-  <form action="/catalog" method="GET" class="filters" role="search" aria-label="Filtrar catalogo">
+  <form action="<%= base %>/catalog" method="GET" class="filters" role="search" aria-label="Filtrar catalogo">
     <div class="field">
       <label for="q">Buscar</label>
       <input type="search" id="q" name="q" value="<%= filters.search %>" placeholder="Titulo, ISBN o autor...">
@@ -73,7 +73,7 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         Filtrar
       </button>
-      <a class="btn btn-secondary" href="/catalog">Limpiar</a>
+      <a class="btn btn-secondary" href="<%= base %>/catalog">Limpiar</a>
     </div>
   </form>
 </div>
@@ -89,7 +89,7 @@
   <div class="grid grid-cards">
     <% items.forEach(function (b) { %>
       <article class="book-card" data-reveal>
-        <a class="book-cover-link" href="/catalog/<%= b.id %>" tabindex="-1" aria-hidden="true">
+        <a class="book-cover-link" href="<%= base %>/catalog/<%= b.id %>" tabindex="-1" aria-hidden="true">
           <% if (b.cover_url) { %>
             <img class="book-cover" src="<%= b.cover_url %>" alt="" loading="lazy" decoding="async">
           <% } else { %>
@@ -100,7 +100,7 @@
           <% } %>
         </a>
         <div class="book-card-body">
-          <h2 class="book-card-title"><a href="/catalog/<%= b.id %>"><%= b.title %></a></h2>
+          <h2 class="book-card-title"><a href="<%= base %>/catalog/<%= b.id %>"><%= b.title %></a></h2>
           <p class="hint"><%= b.authors || 'Sin autores registrados' %></p>
           <div class="badges">
             <span class="badge"><%= b.format_name %></span>

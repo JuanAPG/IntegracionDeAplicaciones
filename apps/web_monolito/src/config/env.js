@@ -15,6 +15,15 @@ module.exports = {
   env: process.env.NODE_ENV || 'development',
   port: toInt(process.env.PORT, 3000),
 
+  // Prefijo bajo el que se monta toda la aplicacion. La pagina de inicio es
+  // http://localhost:<port><basePath>. Se normaliza a "/algo" sin barra final
+  // para poder concatenarlo sin generar dobles barras.
+  basePath: (() => {
+    const raw = process.env.BASE_PATH || '/library';
+    const clean = `/${raw.replace(/^\/+|\/+$/g, '')}`;
+    return clean === '/' ? '' : clean;
+  })(),
+
   db: {
     host: process.env.PGHOST || 'localhost',
     port: toInt(process.env.PGPORT, 5432),

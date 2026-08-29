@@ -2,9 +2,10 @@
 
 const lookupController = require('../../core/crud/lookupController');
 const model = require('./formats.model');
+const config = require('../../config/env');
 
 const meta = {
-  basePath: '/admin/formats',
+  basePath: `${config.basePath}/admin/formats`,
   title: 'Formatos',
   singular: 'formato',
   nameLabel: 'Nombre del formato',

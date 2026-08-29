@@ -7,7 +7,7 @@
    Equivalencias:
      lazy(() => import('@splinetool/react-spline'))
                         ->  import() dinamico del runtime servido en
-                            /vendor/spline/runtime.js (ESM, sin bundler)
+                            <base>/vendor/spline/runtime.js (ESM, sin bundler)
      <Suspense fallback={<span class="loader"/>}>
                         ->  .scene-fallback visible hasta que la escena
                             termina de cargar
@@ -17,11 +17,17 @@
    recibe datos de la aplicacion: solo dibuja la escena en un <canvas>.
    ===================================================================== */
 
-const RUNTIME_URL = '/vendor/spline/runtime.js';
+// Las rutas se derivan de la posicion de ESTE modulo (import.meta.url), no de
+// la raiz del dominio: asi funcionan igual montada la aplicacion en / que bajo
+// un prefijo como /library, sin que el JS de cliente necesite conocerlo.
+// Este archivo se sirve en <base>/js/spline-hero.js, luego '../' es <base>/.
+const ASSET_BASE = new URL('../', import.meta.url);
+
+const RUNTIME_URL = new URL('vendor/spline/runtime.js', ASSET_BASE).href;
 
 // Sin wasmPath el runtime descarga sus binarios .wasm desde el CDN de Spline.
 // Apuntandolo a la misma ruta estatica, el despliegue no depende de terceros.
-const WASM_PATH = '/vendor/spline/';
+const WASM_PATH = new URL('vendor/spline/', ASSET_BASE).href;
 
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 

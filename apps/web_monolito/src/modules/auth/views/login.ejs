@@ -3,7 +3,7 @@
   <h1>Iniciar sesion</h1>
   <p class="lead">Acceda con su cuenta registrada para consultar el catalogo.</p>
 
-  <form action="/auth/login" method="POST" class="mt-5">
+  <form action="<%= base %>/auth/login" method="POST" class="mt-5">
     <div class="field">
       <label for="email">Correo electronico</label>
       <input type="email" id="email" name="email" required autofocus autocomplete="email" placeholder="nombre@correo.com">
@@ -17,7 +17,7 @@
         Entrar
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
       </button>
-      <a href="/auth/register">Crear una cuenta</a>
+      <a href="<%= base %>/auth/register">Crear una cuenta</a>
     </div>
   </form>
 </div>

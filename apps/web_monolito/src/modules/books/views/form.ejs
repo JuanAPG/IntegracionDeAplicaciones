@@ -10,8 +10,8 @@
     <p class="lead">Datos del libro y sus relaciones multivaluadas: autores, generos, conceptos e imagenes.</p>
   </div>
   <div class="actions">
-    <% if (book.id) { %><a class="btn btn-secondary" href="/catalog/<%= book.id %>">Ver en catalogo</a><% } %>
-    <a class="btn btn-secondary" href="/admin/books">
+    <% if (book.id) { %><a class="btn btn-secondary" href="<%= base %>/catalog/<%= book.id %>">Ver en catalogo</a><% } %>
+    <a class="btn btn-secondary" href="<%= base %>/admin/books">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
       Volver
     </a>
@@ -19,7 +19,7 @@
 </div>
 
 <div class="card">
-  <form action="<%= book.id ? '/admin/books/' + book.id : '/admin/books' %>" method="POST">
+  <form action="<%= base %><%= book.id ? '/admin/books/' + book.id : '/admin/books' %>" method="POST">
     <fieldset>
       <legend>Datos del libro</legend>
       <p class="hint" style="margin:0 0 var(--space-4)">FD: ISBN &rarr; titulo, ano, precio, stock, formato, categoria.</p>
@@ -108,7 +108,7 @@
 
     <div class="form-actions">
       <button class="btn btn-primary" type="submit"><%= book.id ? 'Guardar cambios' : 'Crear libro' %></button>
-      <a class="btn btn-secondary" href="/admin/books">Cancelar</a>
+      <a class="btn btn-secondary" href="<%= base %>/admin/books">Cancelar</a>
       <% if (!book.id) { %>
         <span class="hint">Las imagenes y los conceptos se agregan despues de crear el libro.</span>
       <% } %>
@@ -131,10 +131,10 @@
       <% book.concepts.forEach(function (c) { %>
         <div class="concept">
           <p class="concept-name">
-            <a href="/admin/concepts/<%= c.concept_id %>"><%= c.name %></a>
+            <a href="<%= base %>/admin/concepts/<%= c.concept_id %>"><%= c.name %></a>
           </p>
 
-          <form action="/admin/books/<%= book.id %>/concepts/<%= c.concept_id %>" method="POST"
+          <form action="<%= base %>/admin/books/<%= book.id %>/concepts/<%= c.concept_id %>" method="POST"
                 id="concepto-<%= c.concept_id %>">
             <div class="field">
               <label for="definition_<%= c.concept_id %>" class="sr-only">Definicion de <%= c.name %> en este libro</label>
@@ -142,7 +142,7 @@
             </div>
           </form>
 
-          <form action="/admin/books/<%= book.id %>/concepts/<%= c.concept_id %>/delete" method="POST"
+          <form action="<%= base %>/admin/books/<%= book.id %>/concepts/<%= c.concept_id %>/delete" method="POST"
                 id="quitar-<%= c.concept_id %>"
                 onsubmit="return confirm('Quitar el concepto &quot;<%= c.name %>&quot; de este libro?');"></form>
 
@@ -158,7 +158,7 @@
 
     <fieldset class="mt-5">
       <legend>Agregar concepto al libro</legend>
-      <form action="/admin/books/<%= book.id %>/concepts" method="POST">
+      <form action="<%= base %>/admin/books/<%= book.id %>/concepts" method="POST">
         <div class="form-row">
           <div class="field">
             <label for="concept_id">Concepto existente</label>
@@ -189,7 +189,7 @@
     <h2>Imagenes del libro</h2>
     <p class="lead">Un libro puede tener varias imagenes; solo una puede ser la portada.</p>
 
-    <form action="/admin/books/<%= book.id %>/images" method="POST" enctype="multipart/form-data" class="mt-4">
+    <form action="<%= base %>/admin/books/<%= book.id %>/images" method="POST" enctype="multipart/form-data" class="mt-4">
       <div class="form-row">
         <div class="field">
           <label for="image">Archivo de imagen</label>
@@ -216,16 +216,16 @@
       <div class="image-admin mt-5">
         <% book.images.forEach(function (img) { %>
           <figure>
-            <img src="<%= img.url %>" alt="Imagen de <%= book.title %>" loading="lazy" decoding="async">
+            <img src="<%= asset(img.url) %>" alt="Imagen de <%= book.title %>" loading="lazy" decoding="async">
             <figcaption>
               <% if (img.is_cover) { %><span class="badge badge-stock-ok">Portada</span><% } %>
               <div class="actions">
                 <% if (!img.is_cover) { %>
-                  <form action="/admin/books/<%= book.id %>/images/<%= img.id %>/cover" method="POST" class="inline">
+                  <form action="<%= base %>/admin/books/<%= book.id %>/images/<%= img.id %>/cover" method="POST" class="inline">
                     <button class="btn btn-secondary btn-sm" type="submit">Hacer portada</button>
                   </form>
                 <% } %>
-                <form action="/admin/books/<%= book.id %>/images/<%= img.id %>/delete" method="POST" class="inline"
+                <form action="<%= base %>/admin/books/<%= book.id %>/images/<%= img.id %>/delete" method="POST" class="inline"
                       onsubmit="return confirm('Eliminar esta imagen?');">
                   <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
                 </form>

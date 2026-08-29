@@ -8,6 +8,7 @@ const asyncHandler = require('../../core/utils/asyncHandler');
 const password = require('../../core/utils/password');
 const { str, requiredStr, isEmail } = require('../../core/utils/validate');
 const users = require('../users/users.model');
+const config = require('../../config/env');
 
 const sessionUser = (user) => ({
   id: user.id,
@@ -27,18 +28,22 @@ const login = asyncHandler(async (req, res) => {
   const user = await users.findByEmail(email);
   if (!user || !(await password.verify(plain, user.password_hash))) {
     req.flash('error', 'Correo o contrasena incorrectos.');
-    return res.redirect('/auth/login');
+    return res.redirect(`${config.basePath}/auth/login`);
   }
   if (!user.is_active) {
     req.flash('error', 'La cuenta esta desactivada. Contacte al administrador.');
-    return res.redirect('/auth/login');
+    return res.redirect(`${config.basePath}/auth/login`);
   }
 
-  const redirectTo = req.session.returnTo || (user.role === 'admin' ? '/admin' : '/catalog');
+  // returnTo guarda req.originalUrl, que ya incluye el prefijo de montaje;
+  // los destinos por defecto son rutas del router y hay que prefijarlas.
+  const redirectTo =
+    req.session.returnTo ||
+    `${config.basePath}${user.role === 'admin' ? '/admin' : '/catalog'}`;
   return req.session.regenerate((err) => {
     if (err) {
       req.flash('error', 'No fue posible iniciar la sesion.');
-      return res.redirect('/auth/login');
+      return res.redirect(`${config.basePath}/auth/login`);
     }
     req.session.user = sessionUser(user);
     req.session.flash = { success: [`Bienvenido, ${user.full_name}.`], error: [], info: [] };
@@ -59,13 +64,13 @@ const register = asyncHandler(async (req, res) => {
 
   if (errors.length) {
     req.flash('error', errors);
-    return res.redirect('/auth/register');
+    return res.redirect(`${config.basePath}/auth/register`);
   }
 
   const existing = await users.findByEmail(email);
   if (existing) {
     req.flash('error', 'Ya existe una cuenta registrada con ese correo.');
-    return res.redirect('/auth/register');
+    return res.redirect(`${config.basePath}/auth/register`);
   }
 
   // El registro publico siempre crea usuarios con rol "user":
@@ -79,11 +84,11 @@ const register = asyncHandler(async (req, res) => {
 
   req.session.user = sessionUser(created);
   req.flash('success', `Cuenta creada. Bienvenido, ${created.full_name}.`);
-  return res.redirect('/catalog');
+  return res.redirect(`${config.basePath}/catalog`);
 });
 
 const logout = (req, res) => {
-  req.session.destroy(() => res.redirect('/auth/login'));
+  req.session.destroy(() => res.redirect(`${config.basePath}/auth/login`));
 };
 
 const profile = asyncHandler(async (req, res) => {
@@ -99,13 +104,13 @@ const updateProfile = asyncHandler(async (req, res) => {
 
   if (errors.length) {
     req.flash('error', errors);
-    return res.redirect('/auth/profile');
+    return res.redirect(`${config.basePath}/auth/profile`);
   }
 
   const updated = await users.updateProfile(req.session.user.id, { fullName, email });
   req.session.user = sessionUser(updated);
   req.flash('success', 'Datos de perfil actualizados.');
-  return res.redirect('/auth/profile');
+  return res.redirect(`${config.basePath}/auth/profile`);
 });
 
 const changePassword = asyncHandler(async (req, res) => {
@@ -121,12 +126,12 @@ const changePassword = asyncHandler(async (req, res) => {
 
   if (errors.length) {
     req.flash('error', errors);
-    return res.redirect('/auth/profile');
+    return res.redirect(`${config.basePath}/auth/profile`);
   }
 
   await users.updatePassword(req.session.user.id, await password.hash(next));
   req.flash('success', 'Contrasena actualizada.');
-  return res.redirect('/auth/profile');
+  return res.redirect(`${config.basePath}/auth/profile`);
 });
 
 module.exports = { showLogin, login, showRegister, register, logout, profile, updateProfile, changePassword };

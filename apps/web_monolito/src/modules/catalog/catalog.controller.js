@@ -24,7 +24,7 @@ const concepts = require('../concepts/concepts.model');
  */
 const home = asyncHandler(async (req, res) => {
   if (req.session.user) {
-    return res.redirect(req.session.user.role === 'admin' ? '/admin' : '/catalog');
+    return res.redirect(`${config.basePath}${req.session.user.role === 'admin' ? '/admin' : '/catalog'}`);
   }
 
   let highlights = null;
@@ -77,7 +77,7 @@ const index = asyncHandler(async (req, res) => {
     pagination: {
       page,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
-      baseUrl: `/catalog${params.length ? `?${params.join('&')}` : ''}`
+      baseUrl: `${config.basePath}/catalog${params.length ? `?${params.join('&')}` : ''}`
     }
   });
 });
@@ -86,7 +86,7 @@ const show = asyncHandler(async (req, res) => {
   const book = await books.findFull(req.params.id);
   if (!book) {
     req.flash('error', 'El libro solicitado no existe.');
-    return res.redirect('/catalog');
+    return res.redirect(`${config.basePath}/catalog`);
   }
   const cover = book.images.find((image) => image.is_cover) || book.images[0] || null;
   return res.page('catalog/views/show', { title: book.title, book, cover });

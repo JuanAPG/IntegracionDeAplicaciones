@@ -24,14 +24,16 @@ app.set('views', [path.join(__dirname, 'modules'), path.join(__dirname, 'views')
 app.use(express.urlencoded({ extended: false }));
 
 // --- Archivos estaticos (CSS, JS de interfaz e imagenes cargadas) ------
-app.use('/library', express.static(path.join(__dirname, 'public')));
+// redirect:false evita que serve-static conteste 301 a /library (peticion de
+// "directorio") antes de que el router pueda servir la pagina de inicio.
+app.use(config.basePath, express.static(path.join(__dirname, 'public'), { redirect: false }));
 // --- Runtime 3D de Spline ----------------------------------------------
 // El paquete @splinetool/runtime se publica como ESM nativo: se sirve tal
 // cual desde node_modules, sin bundler ni paso de compilacion. Solo se
 // usan modulos y binarios estaticos del motor 3D; la aplicacion sigue sin
 // exponer APIs ni intercambiar JSON/XML.
 app.use(
-  '/library/vendor/spline',
+  `${config.basePath}/vendor/spline`,
   express.static(path.join(require.resolve('@splinetool/runtime'), '..'), {
     immutable: true,
     maxAge: '30d'
@@ -55,7 +57,13 @@ app.use(flash);
 app.use(locals);
 
 // --- Rutas por modulo ---------------------------------------------------
-app.use('/library', routes);
+// La aplicacion vive completa bajo config.basePath ('/library' por defecto).
+app.use(config.basePath, routes);
+
+// La raiz del sitio no sirve contenido propio: redirige al inicio real.
+if (config.basePath) {
+  app.get('/', (req, res) => res.redirect(config.basePath));
+}
 
 app.use(notFoundHandler);
 app.use(errorHandler);

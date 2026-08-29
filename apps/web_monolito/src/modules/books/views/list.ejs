@@ -7,14 +7,14 @@
       ISBN &rarr; titulo, ano, precio, stock, formato y categoria.
     </p>
   </div>
-  <a class="btn btn-primary" href="/admin/books/new">
+  <a class="btn btn-primary" href="<%= base %>/admin/books/new">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg>
     Nuevo libro
   </a>
 </div>
 
 <div class="card">
-  <form action="/admin/books" method="GET" class="filters" role="search">
+  <form action="<%= base %>/admin/books" method="GET" class="filters" role="search">
     <div class="field">
       <label for="q">Buscar</label>
       <input type="search" id="q" name="q" value="<%= filters.search %>" placeholder="Titulo, ISBN o autor...">
@@ -58,7 +58,7 @@
     </div>
     <div class="form-actions">
       <button class="btn btn-primary" type="submit">Filtrar</button>
-      <a class="btn btn-secondary" href="/admin/books">Limpiar</a>
+      <a class="btn btn-secondary" href="<%= base %>/admin/books">Limpiar</a>
     </div>
   </form>
 </div>
@@ -91,7 +91,7 @@
               <% } %>
             </td>
             <td>
-              <strong><a href="/catalog/<%= b.id %>"><%= b.title %></a></strong><br>
+              <strong><a href="<%= base %>/catalog/<%= b.id %>"><%= b.title %></a></strong><br>
               <span class="hint"><%= b.authors || 'Sin autores' %></span>
             </td>
             <td class="mono hint"><%= b.isbn %></td>
@@ -114,8 +114,8 @@
             <td class="num hint"><%= b.concepts_count %> / <%= b.images_count %></td>
             <td>
               <div class="actions">
-                <a class="btn btn-secondary btn-sm" href="/admin/books/<%= b.id %>/edit">Editar</a>
-                <form action="/admin/books/<%= b.id %>/delete" method="POST" class="inline"
+                <a class="btn btn-secondary btn-sm" href="<%= base %>/admin/books/<%= b.id %>/edit">Editar</a>
+                <form action="<%= base %>/admin/books/<%= b.id %>/delete" method="POST" class="inline"
                       onsubmit="return confirm('Eliminar el libro &quot;<%= b.title %>&quot; y todas sus relaciones?');">
                   <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
                 </form>

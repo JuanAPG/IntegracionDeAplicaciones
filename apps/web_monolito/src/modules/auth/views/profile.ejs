@@ -10,7 +10,7 @@
 <div class="grid grid-2">
   <div class="card">
     <h2>Datos personales</h2>
-    <form action="/auth/profile" method="POST">
+    <form action="<%= base %>/auth/profile" method="POST">
       <div class="field">
         <label for="full_name">Nombre completo</label>
         <input type="text" id="full_name" name="full_name" value="<%= user.full_name %>" required maxlength="150" autocomplete="name">
@@ -27,7 +27,7 @@
 
   <div class="card">
     <h2>Cambiar contrasena</h2>
-    <form action="/auth/profile/password" method="POST">
+    <form action="<%= base %>/auth/profile/password" method="POST">
       <div class="field">
         <label for="current_password">Contrasena actual</label>
         <input type="password" id="current_password" name="current_password" required autocomplete="current-password">

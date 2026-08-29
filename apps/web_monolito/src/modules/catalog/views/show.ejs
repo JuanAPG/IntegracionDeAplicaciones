@@ -9,11 +9,11 @@
     </p>
   </div>
   <div class="actions">
-    <a class="btn btn-secondary" href="/catalog">
+    <a class="btn btn-secondary" href="<%= base %>/catalog">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
       Volver al catalogo
     </a>
-    <% if (isAdmin) { %><a class="btn btn-primary" href="/admin/books/<%= book.id %>/edit">Editar</a><% } %>
+    <% if (isAdmin) { %><a class="btn btn-primary" href="<%= base %>/admin/books/<%= book.id %>/edit">Editar</a><% } %>
   </div>
 </div>
 
@@ -21,7 +21,7 @@
   <div>
     <div class="card">
       <% if (cover) { %>
-        <img class="detail-cover" src="<%= cover.url %>" alt="Portada de <%= book.title %>">
+        <img class="detail-cover" src="<%= asset(cover.url) %>" alt="Portada de <%= book.title %>">
       <% } else { %>
         <div class="book-cover-placeholder" style="border-radius:var(--r-md)">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
@@ -32,7 +32,7 @@
       <% if (book.images.length > 1) { %>
         <div class="gallery">
           <% book.images.forEach(function (img) { %>
-            <img src="<%= img.url %>" alt="Imagen adicional de <%= book.title %>" loading="lazy" decoding="async">
+            <img src="<%= asset(img.url) %>" alt="Imagen adicional de <%= book.title %>" loading="lazy" decoding="async">
           <% }); %>
         </div>
       <% } %>
@@ -61,7 +61,7 @@
           <div class="badges">
             <% if (!book.genres.length) { %><span class="hint">Sin generos</span><% } %>
             <% book.genres.forEach(function (g) { %>
-              <a class="badge" href="/catalog?genre=<%= g.id %>"><%= g.name %></a>
+              <a class="badge" href="<%= base %>/catalog?genre=<%= g.id %>"><%= g.name %></a>
             <% }); %>
           </div>
         </dd>
@@ -70,7 +70,7 @@
           <div class="badges">
             <% if (!book.authors.length) { %><span class="hint">Sin autores</span><% } %>
             <% book.authors.forEach(function (a) { %>
-              <a class="badge" href="/catalog?author=<%= a.id %>"><%= a.name %></a>
+              <a class="badge" href="<%= base %>/catalog?author=<%= a.id %>"><%= a.name %></a>
             <% }); %>
           </div>
         </dd>
