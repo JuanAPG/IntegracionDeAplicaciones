@@ -24,7 +24,7 @@ app.set('views', [path.join(__dirname, 'modules'), path.join(__dirname, 'views')
 app.use(express.urlencoded({ extended: false }));
 
 // --- Archivos estaticos (CSS, JS de interfaz e imagenes cargadas) ------
-dapp.use('/library', express.static(path.join(__dirname, 'public')));
+app.use('/library', express.static(path.join(__dirname, 'public')));
 // --- Runtime 3D de Spline ----------------------------------------------
 // El paquete @splinetool/runtime se publica como ESM nativo: se sirve tal
 // cual desde node_modules, sin bundler ni paso de compilacion. Solo se
