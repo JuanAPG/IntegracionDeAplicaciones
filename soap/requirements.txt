@@ -1,0 +1,19 @@
+# Microservicio de libros (Flask + PostgreSQL)
+#
+#   python3 -m venv .venv
+#   source .venv/bin/activate
+#   pip install -r requirements.txt
+#
+# Los rangos son abiertos dentro de la version mayor: psycopg2-binary
+# solo publica ruedas precompiladas para las versiones de Python ya
+# liberadas, de modo que fijar un parche exacto rompe la instalacion en
+# interpretes mas nuevos.
+Flask>=3.0,<4
+Flask-Cors>=4.0,<7
+psycopg2-binary>=2.9.10,<3
+python-dotenv>=1.0,<2
+gunicorn>=21.2
+
+# Documentacion: publica /openapi.json y la interfaz Swagger UI en /docs.
+# Trae los archivos de Swagger UI en el propio paquete (funciona sin Internet).
+flasgger>=0.9.7

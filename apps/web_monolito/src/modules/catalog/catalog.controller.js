@@ -13,7 +13,6 @@ const authors = require('../authors/authors.model');
 const genres = require('../genres/genres.model');
 const formats = require('../formats/formats.model');
 const categories = require('../categories/categories.model');
-const concepts = require('../concepts/concepts.model');
 
 /**
  * Pagina de bienvenida publica.
@@ -27,12 +26,11 @@ const home = asyncHandler(async (req, res) => {
     return res.redirect(`${config.basePath}${req.session.user.role === 'admin' ? '/admin' : '/catalog'}`);
   }
 
+  // Las cifras salen de la vista library.v_catalog_stats: una sola fila y
+  // una sola consulta, en lugar de cuatro conteos en paralelo.
   let highlights = null;
   try {
-    const [bookCount, authorCount, genreCount, conceptCount] = await Promise.all([
-      books.count({}), authors.count(), genres.count(), concepts.count()
-    ]);
-    highlights = { books: bookCount, authors: authorCount, genres: genreCount, concepts: conceptCount };
+    highlights = await books.stats();
   } catch (err) {
     highlights = null;
   }

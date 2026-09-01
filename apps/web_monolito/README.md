@@ -47,14 +47,15 @@ libro ->> (concepto, definicion)   book_concepts
 ```
 
 `formats` y `categories` son catalogos independientes (1:N hacia `books`).
-El esquema completo esta en `data/schema.sql` (raiz del proyecto).
+El esquema completo esta en `db/01_schema.sql` (raiz del proyecto). Los
+disparadores estan en `db/05_triggers.sql` y las vistas en `db/06_views.sql`.
 
 ## 3. Estructura del codigo
 
 ```
 apps/web_monolito/
 ├── server.js                  Punto de entrada del monolito
-(los datos de demostracion viven en data/seed.sql, en la raiz)
+(los datos de demostracion viven en db/02_seed_30_per_table.sql, en la raiz)
 ├── scripts/setup-db.js        Instalador: esquema + datos + administrador
 └── src/
     ├── app.js                 Composicion de Express (vistas, sesion, rutas)
@@ -205,7 +206,7 @@ sudo -u postgres psql -d library_db -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;
 ```bash
 sudo useradd --system --create-home --home-dir /opt/library --shell /sbin/nologin library
 sudo mkdir -p /opt/library/app
-# Copie el proyecto (carpetas apps/ y data/) al servidor, por ejemplo con scp o git clone
+# Copie el proyecto (carpetas apps/ y db/) al servidor, por ejemplo con scp o git clone
 sudo cp -r /ruta/al/proyecto/library/* /opt/library/app/
 sudo chown -R library:library /opt/library
 ```
@@ -214,7 +215,7 @@ Estructura esperada en el servidor:
 
 ```
 /opt/library/app/
-├── data/schema.sql
+├── db/01_schema.sql
 └── apps/web_monolito/
 ```
 
@@ -276,12 +277,13 @@ sudo -u library npm run db:setup
 
 El script:
 
-1. aplica `data/schema.sql` si el esquema `library` todavia no existe;
-2. carga los datos de demostracion de `data/seed.sql`;
+1. aplica `db/01_schema.sql`, `db/06_views.sql`, `db/04_stored_procedures.sql`
+   y `db/05_triggers.sql`;
+2. carga los datos de demostracion de `db/02_seed_30_per_table.sql`;
 3. crea el **unico** administrador con la contrasena cifrada con bcrypt.
 
-`data/seed.sql` es el unico archivo con `INSERT` (busque la marca
-`>>> INICIO DE LOS INSERTS <<<`); `data/schema.sql` solo contiene la
+`db/02_seed_30_per_table.sql` es el unico archivo con `INSERT` (busque la marca
+`>>> INICIO DE LOS INSERTS <<<`); `db/01_schema.sql` solo contiene la
 estructura. Los datos que carga son: 4 formatos, 5 categorias, 12 generos,
 20 autores, 16 conceptos, 13 libros con sus autores, generos, definiciones
 e imagenes de portada, y 5 usuarios de demostracion con rol `user`
@@ -299,8 +301,13 @@ sudo -u library node scripts/setup-db.js --seed-only   # solo datos + administra
 Alternativa manual con `psql`:
 
 ```bash
-psql "postgresql://library_user:777@localhost:5432/library_db" -f /opt/library/app/data/schema.sql
-psql "postgresql://library_user:777@localhost:5432/library_db" -f /opt/library/app/data/seed.sql
+# Como superusuario, una sola vez: crea rol, base de datos y extensiones
+psql -U postgres -f /opt/library/app/db/00_create_database.sql
+
+# Estructura, vistas, funciones, disparadores y datos (en orden de dependencia)
+for f in 01_schema 06_views 04_stored_procedures 05_triggers 02_seed_30_per_table; do
+  psql "postgresql://library_user:777@localhost:5432/library_db" -f /opt/library/app/db/$f.sql
+done
 # El administrador debe crearse con el script, para que la contrasena quede cifrada:
 sudo -u library node scripts/setup-db.js --seed-only
 ```
@@ -482,7 +489,7 @@ npm run dev                   # http://localhost:3000/library
 
 Credenciales iniciales: las que indique `.env` (por omision
 `admin@library.local` / `Admin123!`). Los usuarios de demostracion que
-carga `data/seed.sql` usan la contrasena `Demo123!` (por ejemplo
+carga `db/02_seed_30_per_table.sql` usan la contrasena `Demo123!` (por ejemplo
 `laura.mendez@example.com`).
 
 

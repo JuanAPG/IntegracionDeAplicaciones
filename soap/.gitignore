@@ -1,0 +1,8 @@
+# El archivo con las credenciales reales NUNCA se publica.
+.env
+
+# Entorno virtual y cache de Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]

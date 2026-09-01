@@ -135,7 +135,7 @@ const create = asyncHandler(async (req, res) => {
   const authorIds = intArray(req.body.author_ids).concat(await resolveNames(req.body.new_authors, authors));
   const genreIds = intArray(req.body.genre_ids).concat(await resolveNames(req.body.new_genres, genres));
 
-  const bookId = await model.create(data, { authorIds, genreIds, concepts: [] });
+  const bookId = await model.create(data, { authorIds, genreIds });
   req.flash('success', `Libro "${data.title}" creado. Agregue sus imagenes y conceptos.`);
   return res.redirect(`${BASE}/${bookId}/edit`);
 });
@@ -174,11 +174,9 @@ const update = asyncHandler(async (req, res) => {
   const genreIds = intArray(req.body.genre_ids).concat(await resolveNames(req.body.new_genres, genres));
 
   // Los conceptos se administran con sus propios formularios (addConcept /
-  // updateConcept / removeConcept); aqui solo se conservan tal como estan.
-  const existing = await model.conceptsOf(id);
-  const keptConcepts = existing.map((c) => ({ conceptId: c.concept_id, definition: c.definition }));
-
-  const ok = await model.update(id, data, { authorIds, genreIds, concepts: keptConcepts });
+  // updateConcept / removeConcept). library.sp_update_book no toca
+  // book_concepts, asi que ya no hace falta releerlos y reenviarlos.
+  const ok = await model.update(id, data, { authorIds, genreIds });
   if (!ok) {
     req.flash('error', 'Libro no encontrado.');
     return res.redirect(BASE);
