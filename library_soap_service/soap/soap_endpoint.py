@@ -3,7 +3,8 @@ library_soap_service/soap/soap_endpoint.py
 Endpoint SOAP 1.1 (document/literal) del modulo de clasificacion en la
 nube. Implementa el contrato de wsdl/library-classiffier.wsdl:
 
-    ObtenerConceptosPendientes, RegistrarClasificacion, ObtenerProgresoUsuario
+    ObtenerConceptosPendientes, RegistrarClasificacion, ObtenerProgresoUsuario,
+    ObtenerEstadisticasPorModelo (protegida con WS-Security, ver mas abajo)
 
 Disenio
   * xml.etree.ElementTree para leer Y construir el XML: nunca se arma un
@@ -47,6 +48,8 @@ Diseno de errores (SOAP Fault)
   | Libro o concepto inexistente             | CLIENTE    | libro_inexistente,     | 404  |
   |                                           |            | concepto_inexistente   |      |
   | Clasificacion duplicada                  | CONFLICTO  | clasificacion_duplicada| 409  |
+  | WS-Security ausente o credenciales        | AUTENTICACION | credenciales_ausentes,| 401 |
+  |   invalidas (solo ObtenerEstadisticasPorModelo)|      | credenciales_invalidas |     |
   | Falla de PostgreSQL / error no controlado| SERVIDOR   | base_datos_no_disponible,| 500|
   |                                           |            | error_interno          |      |
 
@@ -61,6 +64,24 @@ Diseno de errores (SOAP Fault)
   PostgreSQL, una ruta del servidor ni el texto de una consulta SQL: eso
   solo se registra en el log (ver _fault_response y los manejadores de
   db.DatabaseUnavailable / Exception en handle_request).
+
+WS-Security (ObtenerEstadisticasPorModelo)
+  Unica operacion protegida: exige un wsse:UsernameToken (perfil
+  PasswordText de WS-Security 1.0) dentro de soap:Header. La contrasena
+  SIEMPRE viaja como parametro enlazado hacia
+  sp_verificar_credencial_soap (soap_module.sql), que la compara contra
+  un hash bcrypt (pgcrypto) sin que esta capa la vea en claro en ningun
+  otro punto; nunca se registra en el log ni aparece en un Fault. Sin
+  header, sin UsernameToken, o con credenciales que no verifican ->
+  Unauthorized (errors.py) -> Fault categoria AUTENTICACION, HTTP 401,
+  antes de ejecutar la consulta de estadisticas.
+
+  PasswordText manda la contrasena en texto plano dentro del XML (no en
+  claro por la red si el endpoint esta detras de HTTPS/TLS, que es
+  obligatorio en produccion para esta operacion); es el perfil minimo
+  de WS-Security 1.0 y el apropiado para un ejercicio academico. Un
+  perfil PasswordDigest evitaria ademas eso, a costa de sincronizar
+  nonce+timestamp entre cliente y servidor -- fuera de alcance aqui.
 """
 import logging
 from xml.etree import ElementTree
@@ -68,24 +89,31 @@ from xml.etree import ElementTree
 import clasificacion_repository as repo
 import config
 import db
-from errors import ApiError, Conflict, NotFound, ValidationError
+from errors import ApiError, Conflict, NotFound, Unauthorized, ValidationError
 
 log = logging.getLogger("library.soap.clasificacion")
 
 SOAP_NS = "http://schemas.xmlsoap.org/soap/envelope/"
 TNS = config.CLASIFICACION_NAMESPACE
+# Namespace estandar de WS-Security UsernameToken Profile 1.0 (OASIS).
+# No se importa el XSD completo (innecesario para el alcance del
+# ejercicio): solo se leen los dos elementos que interesan,
+# wsse:Username y wsse:Password, calificados con esta URI.
+WSSE_NS = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
 
 ElementTree.register_namespace("soap", SOAP_NS)
 ElementTree.register_namespace("clv", TNS)
+ElementTree.register_namespace("wsse", WSSE_NS)
 
 # categoria -> prefijo de faultcode y estado HTTP por omision. SOAP
 # 1.1 admite subcodigos con notacion de punto bajo Client/Server (p.ej.
 # "Client.Validacion"); se usan para que el faultcode por si solo ya
-# distinga los cuatro casos sin tener que leer <detail>.
+# distinga los cinco casos sin tener que leer <detail>.
 _FAULTCODE = {
     "CLIENTE": "soap:Client",
     "VALIDACION": "soap:Client.Validacion",
     "CONFLICTO": "soap:Client.Conflicto",
+    "AUTENTICACION": "soap:Client.Autenticacion",
     "SERVIDOR": "soap:Server",
 }
 
@@ -185,6 +213,33 @@ def _read_cliente_info(header):
     return tipo, identificador
 
 
+def _leer_credenciales_wsse(header):
+    """
+    Extrae usuario/contrasena de un wsse:UsernameToken (perfil
+    PasswordText) dentro de soap:Header. Lanza Unauthorized -- nunca
+    devuelve credenciales parciales -- si falta el header, el bloque
+    Security, el token, o si usuario/contrasena vienen vacios. NO
+    verifica la contrasena aqui: eso lo hace
+    clasificacion_repository.verificar_credencial_soap contra el hash
+    en PostgreSQL; esta funcion solo se asegura de que algo se recibio.
+    """
+    if header is not None:
+        security = header.find(_q(WSSE_NS, "Security"))
+        token = security.find(_q(WSSE_NS, "UsernameToken")) if security is not None else None
+        if token is not None:
+            username_el = token.find(_q(WSSE_NS, "Username"))
+            password_el = token.find(_q(WSSE_NS, "Password"))
+            username = username_el.text.strip() if username_el is not None and username_el.text else ""
+            password = password_el.text.strip() if password_el is not None and password_el.text else ""
+            if username and password:
+                return username, password
+
+    raise Unauthorized(
+        "Esta operacion requiere autenticacion WS-Security: un "
+        "wsse:UsernameToken con Username y Password dentro de soap:Header.",
+        code="credenciales_ausentes")
+
+
 # ---------------------------------------------------------------------
 # Construccion de la respuesta
 # ---------------------------------------------------------------------
@@ -230,6 +285,7 @@ def _fault_response(categoria, codigo, mensaje, http_status, ayuda=None):
 
 # categoria de Fault segun la excepcion de negocio (errors.py) atrapada.
 _CATEGORIA_POR_EXCEPCION = (
+    (Unauthorized, "AUTENTICACION"),
     (Conflict, "CONFLICTO"),
     (NotFound, "CLIENTE"),
     (ValidationError, "VALIDACION"),
@@ -244,7 +300,7 @@ def _fault_from_api_error(exc):
 # ---------------------------------------------------------------------
 # Operaciones
 # ---------------------------------------------------------------------
-def _op_obtener_conceptos_pendientes(request_el):
+def _op_obtener_conceptos_pendientes(request_el, header):
     email = _find_text(request_el, "clasificador_email")
     limite = _find_int(request_el, "limite", required=False,
                        default=config.CLASIFICACION_DEFAULT_LIMIT)
@@ -263,7 +319,7 @@ def _op_obtener_conceptos_pendientes(request_el):
     return response
 
 
-def _op_registrar_clasificacion(request_el):
+def _op_registrar_clasificacion(request_el, header):
     email = _find_text(request_el, "clasificador_email")
     isbn = _find_text(request_el, "referencia_libro")
     concepto = _find_text(request_el, "referencia_concepto")
@@ -279,13 +335,34 @@ def _op_registrar_clasificacion(request_el):
     return response
 
 
-def _op_obtener_progreso_usuario(request_el):
+def _op_obtener_progreso_usuario(request_el, header):
     email = _find_text(request_el, "clasificador_email")
     total_clasificados, total_pendientes = repo.progreso_usuario(email)
 
     response = ElementTree.Element(_q(TNS, "ObtenerProgresoUsuarioResponse"))
     ElementTree.SubElement(response, _q(TNS, "total_clasificados")).text = str(total_clasificados)
     ElementTree.SubElement(response, _q(TNS, "total_pendientes")).text = str(total_pendientes)
+    return response
+
+
+_MODELOS_ESTADISTICA = ("IaaS", "PaaS", "SaaS", "FaaS")
+
+
+def _op_obtener_estadisticas_por_modelo(request_el, header):
+    # Sin parametros de entrada: request_el no se lee. Se autentica
+    # ANTES de tocar la base -- credenciales invalidas nunca llegan a
+    # ejecutar la consulta de estadisticas.
+    username, password = _leer_credenciales_wsse(header)
+    if not repo.verificar_credencial_soap(username, password):
+        raise Unauthorized("Usuario o contrasena invalidos.", code="credenciales_invalidas")
+
+    conteos = repo.estadisticas_por_modelo()
+
+    response = ElementTree.Element(_q(TNS, "ObtenerEstadisticasPorModeloResponse"))
+    for modelo in _MODELOS_ESTADISTICA:
+        item = ElementTree.SubElement(response, _q(TNS, "estadistica"))
+        ElementTree.SubElement(item, _q(TNS, "modelo_servicio")).text = modelo
+        ElementTree.SubElement(item, _q(TNS, "total")).text = str(conteos.get(modelo, 0))
     return response
 
 
@@ -297,6 +374,7 @@ _OPERATIONS = {
     "ObtenerConceptosPendientes": _op_obtener_conceptos_pendientes,
     "RegistrarClasificacion": _op_registrar_clasificacion,
     "ObtenerProgresoUsuario": _op_obtener_progreso_usuario,
+    "ObtenerEstadisticasPorModelo": _op_obtener_estadisticas_por_modelo,
 }
 
 
@@ -333,7 +411,7 @@ def handle_request(raw_body):
                 f"Operacion desconocida: '{op_name}'.", code="operacion_desconocida",
                 ayuda=f"Operaciones validas: {', '.join(_OPERATIONS)}.")
 
-        response_el = handler(request_el)
+        response_el = handler(request_el, header)
         envelope = _envelope_with_body(response_el)
         return _to_xml_bytes(envelope), 200
 

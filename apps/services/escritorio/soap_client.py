@@ -13,9 +13,15 @@ from xml.etree import ElementTree
 
 SOAP_NS = "http://schemas.xmlsoap.org/soap/envelope/"
 TNS = "urn:library:clasificacion:1.0"
+# WS-Security UsernameToken Profile 1.0 (OASIS), perfil PasswordText.
+# Solo se usa en ObtenerEstadisticasPorModelo (ver soap_endpoint.py).
+WSSE_NS = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
+WSSE_PASSWORD_TEXT = ("http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-"
+                     "username-token-profile-1.0#PasswordText")
 
 ElementTree.register_namespace("soap", SOAP_NS)
 ElementTree.register_namespace("clv", TNS)
+ElementTree.register_namespace("wsse", WSSE_NS)
 
 
 def _q(ns, local):
@@ -42,13 +48,29 @@ class SoapTransportError(Exception):
     """No hubo una respuesta SOAP valida (red, timeout, HTML de un proxy, etc.)."""
 
 
-def _build_envelope(operation, fields, header=None):
+def _build_envelope(operation, fields, header=None, wsse_credentials=None):
+    """
+    wsse_credentials: tupla opcional (username, password). Si se da, se
+    agrega un <wsse:Security><wsse:UsernameToken> a soap:Header, perfil
+    PasswordText -- la contrasena viaja en texto dentro del XML (por
+    eso esta operacion debe correr detras de HTTPS/TLS en produccion),
+    nunca se concatena a mano: es .text de un SubElement, igual que
+    cualquier otro campo, asi que se escapa igual.
+    """
     envelope = ElementTree.Element(_q(SOAP_NS, "Envelope"))
     header_el = ElementTree.SubElement(envelope, _q(SOAP_NS, "Header"))
     if header:
         cliente_info = ElementTree.SubElement(header_el, _q(TNS, "ClienteInfo"))
         for key, value in header.items():
             ElementTree.SubElement(cliente_info, _q(TNS, key)).text = str(value)
+    if wsse_credentials:
+        username, password = wsse_credentials
+        security = ElementTree.SubElement(header_el, _q(WSSE_NS, "Security"))
+        token = ElementTree.SubElement(security, _q(WSSE_NS, "UsernameToken"))
+        ElementTree.SubElement(token, _q(WSSE_NS, "Username")).text = username
+        password_el = ElementTree.SubElement(token, _q(WSSE_NS, "Password"))
+        password_el.set("Type", WSSE_PASSWORD_TEXT)
+        password_el.text = password
 
     body = ElementTree.SubElement(envelope, _q(SOAP_NS, "Body"))
     request_el = ElementTree.SubElement(body, _q(TNS, f"{operation}Request"))
@@ -78,14 +100,15 @@ def _element_to_dict(element):
     return result
 
 
-def call(url, operation, fields, header=None, timeout=10):
+def call(url, operation, fields, header=None, wsse_credentials=None, timeout=10):
     """
     Ejecuta una operacion SOAP contra `url`. Devuelve un dict con la
     respuesta ya deserializada, o lanza SoapFaultError (el servidor
-    entendio la peticion pero la rechazo) o SoapTransportError (no se
+    entendio la peticion pero la rechazo -- incluye credenciales
+    WS-Security ausentes o invalidas) o SoapTransportError (no se
     obtuvo una respuesta SOAP interpretable).
     """
-    body = _build_envelope(operation, fields, header)
+    body = _build_envelope(operation, fields, header, wsse_credentials)
     request = urllib.request.Request(
         url, data=body, method="POST",
         headers={"Content-Type": "text/xml; charset=utf-8",
@@ -154,3 +177,19 @@ def registrar_clasificacion(url, email, isbn, concepto, modelo, header=None):
 def obtener_progreso_usuario(url, email, header=None):
     data = call(url, "ObtenerProgresoUsuario", {"clasificador_email": email}, header=header)
     return int(data.get("total_clasificados", 0)), int(data.get("total_pendientes", 0))
+
+
+def obtener_estadisticas_por_modelo(url, username, password, header=None):
+    """
+    Operacion protegida con WS-Security: username/password NUNCA se
+    guardan en este modulo ni se registran en ningun lado, solo viajan
+    en la llamada. Devuelve {'IaaS': total, 'PaaS': total, ...}. Lanza
+    SoapFaultError con categoria='AUTENTICACION' si el servidor rechaza
+    las credenciales.
+    """
+    data = call(url, "ObtenerEstadisticasPorModelo", {}, header=header,
+               wsse_credentials=(username, password))
+    items = data.get("estadistica", [])
+    if isinstance(items, dict):
+        items = [items]
+    return {item["modelo_servicio"]: int(item["total"]) for item in items}

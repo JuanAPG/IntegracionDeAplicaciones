@@ -129,18 +129,56 @@
                 </xsd:complexType>
             </xsd:element>
 
+            <!-- ===== Operacion 4: ObtenerEstadisticasPorModelo =====
+                 Sin parametros de entrada obligatorios: el elemento de
+                 peticion queda vacio (secuencia sin hijos), presente solo
+                 para respetar el patron document/literal "wrapped" de
+                 las demas operaciones. PROTEGIDA con WS-Security: exige
+                 un wsse:UsernameToken en soap:Header (ver el comentario
+                 de la operacion en portType/binding, mas abajo). No
+                 modifica ObtenerConceptosPendientesRequest/Response,
+                 RegistrarClasificacion*, ObtenerProgresoUsuario* ni
+                 ConceptoPendiente/ModeloServicioType: son tipos y
+                 operaciones nuevos, agregados sin tocar los existentes. -->
+            <xsd:element name="ObtenerEstadisticasPorModeloRequest">
+                <xsd:complexType/>
+            </xsd:element>
+
+            <xsd:complexType name="EstadisticaModelo">
+                <xsd:sequence>
+                    <xsd:element name="modelo_servicio" type="tns:ModeloServicioType"/>
+                    <xsd:element name="total" type="xsd:int"/>
+                </xsd:sequence>
+            </xsd:complexType>
+
+            <xsd:element name="ObtenerEstadisticasPorModeloResponse">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="estadistica" type="tns:EstadisticaModelo"
+                                     minOccurs="4" maxOccurs="4"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
             <!-- ===== Forma comun de <detail> en un soap:Fault =====
                  categoria distingue error de entrada (CLIENTE/VALIDACION),
-                 conflicto (CONFLICTO) y error interno (SERVIDOR); codigo es
-                 estable para logica de cliente (p.ej. "modelo_invalido",
-                 "clasificacion_duplicada"); mensaje es texto para mostrar
+                 conflicto (CONFLICTO), autenticacion (AUTENTICACION, solo
+                 ObtenerEstadisticasPorModelo) y error interno (SERVIDOR);
+                 codigo es estable para logica de cliente (p.ej.
+                 "modelo_invalido", "clasificacion_duplicada",
+                 "credenciales_invalidas"); mensaje es texto para mostrar
                  al usuario. Nunca lleva SQL, contrasenas ni rutas de
-                 servidor: eso solo se registra en el log del servicio. -->
+                 servidor: eso solo se registra en el log del servicio.
+                 AUTENTICACION se agrego a la enumeracion sin quitar ni
+                 renombrar los valores existentes: un cliente generado
+                 contra la version anterior del contrato sigue
+                 funcionando igual para los Fault que ya conocia. -->
             <xsd:simpleType name="CategoriaErrorType">
                 <xsd:restriction base="xsd:string">
                     <xsd:enumeration value="CLIENTE"/>
                     <xsd:enumeration value="VALIDACION"/>
                     <xsd:enumeration value="CONFLICTO"/>
+                    <xsd:enumeration value="AUTENTICACION"/>
                     <xsd:enumeration value="SERVIDOR"/>
                 </xsd:restriction>
             </xsd:simpleType>
@@ -183,7 +221,14 @@
         <part name="parameters" element="tns:ObtenerProgresoUsuarioResponse"/>
     </message>
 
-    <!-- Mensaje de soap:Fault compartido por las tres operaciones. -->
+    <message name="ObtenerEstadisticasPorModeloRequestMessage">
+        <part name="parameters" element="tns:ObtenerEstadisticasPorModeloRequest"/>
+    </message>
+    <message name="ObtenerEstadisticasPorModeloResponseMessage">
+        <part name="parameters" element="tns:ObtenerEstadisticasPorModeloResponse"/>
+    </message>
+
+    <!-- Mensaje de soap:Fault compartido por las cuatro operaciones. -->
     <message name="ErrorDetalleMessage">
         <part name="detail" element="tns:ErrorDetalle"/>
     </message>
@@ -219,6 +264,20 @@
             <fault name="Error" message="tns:ErrorDetalleMessage"/>
         </operation>
 
+        <!-- Conteo agregado por modelo Cloud. PROTEGIDA con WS-Security
+             (wsse:UsernameToken, perfil PasswordText, en soap:Header):
+             sin credenciales validas responde Fault categoria
+             AUTENTICACION (HTTP 401) y NO ejecuta la consulta. El
+             encabezado de seguridad es responsabilidad del binding/
+             transporte, no se modela como parte del mensaje de entrada
+             (asi es como WS-Security se superpone a un contrato SOAP
+             existente sin tocarlo). -->
+        <operation name="ObtenerEstadisticasPorModelo">
+            <input message="tns:ObtenerEstadisticasPorModeloRequestMessage"/>
+            <output message="tns:ObtenerEstadisticasPorModeloResponseMessage"/>
+            <fault name="Error" message="tns:ErrorDetalleMessage"/>
+        </operation>
+
     </portType>
 
     <!-- ================================================================
@@ -243,6 +302,21 @@
 
         <operation name="ObtenerProgresoUsuario">
             <soap:operation soapAction="urn:library:clasificacion:1.0#ObtenerProgresoUsuario"/>
+            <input><soap:body use="literal"/></input>
+            <output><soap:body use="literal"/></output>
+            <fault name="Error"><soap:fault name="Error" use="literal"/></fault>
+        </operation>
+
+        <!-- El cliente debe agregar un soap:Header con wsse:Security/
+             wsse:UsernameToken (Username + Password, perfil PasswordText
+             de WS-Security 1.0) en esta llamada; el servidor lo valida
+             antes de construir la respuesta. WSDL 1.1 no tiene una forma
+             estandar de declarar "este header es obligatorio" en el
+             binding sin importar el XSD completo de WS-Security de
+             OASIS: por eso queda documentado aqui como contrato, igual
+             que lo estaria en cualquier binding SOAP con WS-Security. -->
+        <operation name="ObtenerEstadisticasPorModelo">
+            <soap:operation soapAction="urn:library:clasificacion:1.0#ObtenerEstadisticasPorModelo"/>
             <input><soap:body use="literal"/></input>
             <output><soap:body use="literal"/></output>
             <fault name="Error"><soap:fault name="Error" use="literal"/></fault>

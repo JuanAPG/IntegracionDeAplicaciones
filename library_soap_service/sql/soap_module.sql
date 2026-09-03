@@ -346,3 +346,97 @@ LANGUAGE sql AS $$
         SET peticiones_atendidas = library.clientes_servidos.peticiones_atendidas + 1,
             ultima_peticion_en = now();
 $$;
+
+
+-- =====================================================================
+-- WS-SECURITY: credenciales de servicio para ObtenerEstadisticasPorModelo
+--
+-- No son cuentas de clasificador ni se reutiliza library.users del
+-- monolito (la misma regla que ya rige a clasificadores: identidades
+-- propias del modulo SOAP). Son cuentas de SERVICIO -- pensadas para un
+-- integrador/administrador que consulta metricas agregadas, no para
+-- que un clasificador de escritorio se autentique con ellas.
+--
+-- password_hash usa pgcrypto (bcrypt, extension ya habilitada en
+-- db/00_create_database.sql): el texto plano NUNCA se guarda, ni
+-- siquiera transitoriamente en una columna; crypt() con gen_salt('bf')
+-- hace el hashing y el salteo en un solo paso dentro del propio motor.
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS library.soap_credenciales (
+    id              SERIAL        PRIMARY KEY,
+    username        VARCHAR(50)   NOT NULL UNIQUE,
+    password_hash   TEXT          NOT NULL,
+    activo          BOOLEAN       NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    CONSTRAINT ck_soap_credenciales_username_no_vacio CHECK (length(btrim(username)) > 0)
+);
+
+
+-- ---------------------------------------------------------------------
+-- sp_set_soap_credencial
+-- Alta/actualizacion de una credencial de servicio. Uso administrativo
+-- (psql, nunca expuesto por SOAP): quien la ejecute pasa la contrasena
+-- en claro UNA vez, en su propia sesion; crypt()/gen_salt('bf') la
+-- convierte en hash de inmediato y eso es lo unico que se persiste.
+--
+--   SELECT library.sp_set_soap_credencial('admin', 'defina-aqui-su-clave');
+--
+-- No se deja ninguna credencial de ejemplo precargada en este script:
+-- cada despliegue debe crear la suya y nunca subirla a control de
+-- versiones ni a evidencias.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION library.sp_set_soap_credencial(
+    p_username VARCHAR,
+    p_password VARCHAR
+) RETURNS VOID
+LANGUAGE sql AS $$
+    INSERT INTO library.soap_credenciales (username, password_hash)
+    VALUES (p_username, crypt(p_password, gen_salt('bf')))
+    ON CONFLICT (username) DO UPDATE
+        SET password_hash = crypt(p_password, gen_salt('bf')),
+            activo = TRUE;
+$$;
+
+
+-- ---------------------------------------------------------------------
+-- sp_verificar_credencial_soap
+-- Verifica usuario/contrasena para WS-Security. La comparacion ocurre
+-- DENTRO de PostgreSQL: crypt(p_password, password_hash) vuelve a
+-- hashear la contrasena recibida usando el mismo salto ya guardado en
+-- password_hash (bcrypt lo codifica en el propio hash) y compara
+-- cadenas resultantes -- la aplicacion Flask nunca ve ni compara la
+-- contrasena en claro contra nada mas que este resultado booleano.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION library.sp_verificar_credencial_soap(
+    p_username VARCHAR,
+    p_password VARCHAR
+) RETURNS BOOLEAN
+LANGUAGE sql STABLE AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM library.soap_credenciales
+         WHERE username = p_username
+           AND activo = TRUE
+           AND password_hash = crypt(p_password, password_hash)
+    );
+$$;
+
+
+-- ---------------------------------------------------------------------
+-- sp_estadisticas_por_modelo
+-- Backend de ObtenerEstadisticasPorModelo: conteo de clasificaciones
+-- registradas por cada uno de los cuatro modelos Cloud (N/A queda
+-- fuera a proposito, no es un modelo de servicio en la nube). El
+-- VALUES(...) a la izquierda del LEFT JOIN garantiza que los cuatro
+-- modelos aparezcan siempre, con total=0 si todavia no tienen
+-- clasificaciones -- la respuesta nunca cambia de forma segun los
+-- datos.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION library.sp_estadisticas_por_modelo()
+RETURNS TABLE (modelo_servicio VARCHAR, total INTEGER)
+LANGUAGE sql STABLE AS $$
+    SELECT m.modelo, COALESCE(count(cc.id), 0)::INTEGER
+      FROM (VALUES ('IaaS'), ('PaaS'), ('SaaS'), ('FaaS')) AS m(modelo)
+      LEFT JOIN library.clasificaciones_cloud cc ON cc.modelo_cloud = m.modelo
+     GROUP BY m.modelo
+     ORDER BY array_position(ARRAY['IaaS', 'PaaS', 'SaaS', 'FaaS'], m.modelo);
+$$;

@@ -37,3 +37,8 @@ class Conflict(ApiError):
 class UnsupportedMedia(ApiError):
     status = 415
     code = "unsupported_media_type"
+
+
+class Unauthorized(ApiError):
+    status = 401
+    code = "unauthorized"

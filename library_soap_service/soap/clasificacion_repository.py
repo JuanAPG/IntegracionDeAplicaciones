@@ -97,3 +97,24 @@ def registrar_cliente_servido(tipo_cliente, identificador):
     with db.cursor(commit=True) as cur:
         cur.execute("SELECT library.sp_registrar_cliente_servido(%s, %s)",
                     (tipo_cliente, identificador))
+
+
+def verificar_credencial_soap(username, password):
+    """
+    True/False. La comparacion contra el hash ocurre dentro de
+    PostgreSQL (sp_verificar_credencial_soap, bcrypt via pgcrypto);
+    esta capa nunca ve ni compara la contrasena en claro contra nada,
+    solo la reenvia como parametro enlazado y recibe un booleano.
+    """
+    with db.cursor(commit=True) as cur:
+        cur.execute("SELECT library.sp_verificar_credencial_soap(%s, %s) AS ok",
+                    (username, password))
+        return cur.fetchone()["ok"]
+
+
+def estadisticas_por_modelo():
+    """Devuelve {'IaaS': total, 'PaaS': total, 'SaaS': total, 'FaaS': total}."""
+    with db.cursor(commit=True) as cur:
+        cur.execute("SELECT * FROM library.sp_estadisticas_por_modelo()")
+        rows = cur.fetchall()
+    return {row["modelo_servicio"]: row["total"] for row in rows}
