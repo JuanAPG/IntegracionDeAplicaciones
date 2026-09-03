@@ -1,0 +1,7 @@
+SET
+        tipo_cliente         |     identificador     | peticiones_atendidas |      primer_contacto_en       |      ultima_peticion_en       
+-----------------------------+-----------------------+----------------------+-------------------------------+-------------------------------
+ Java-Swing-Clasificador     | carlos.desktop@lab-02 |                    3 | 2026-09-03 05:17:12.424517+00 | 2026-09-03 05:17:12.433243+00
+ Python-Tkinter-Clasificador | ana.desktop@lab-01    |                    9 | 2026-09-03 05:17:12.376696+00 | 2026-09-03 05:17:12.421713+00
+(2 rows)
+

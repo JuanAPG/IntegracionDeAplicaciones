@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:clv="urn:library:clasificacion:1.0" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Header /><soap:Body><clv:ObtenerProgresoUsuarioResponse><clv:total_clasificados>5</clv:total_clasificados><clv:total_pendientes>0</clv:total_pendientes></clv:ObtenerProgresoUsuarioResponse></soap:Body></soap:Envelope>

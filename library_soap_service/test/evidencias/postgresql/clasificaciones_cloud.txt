@@ -1,0 +1,11 @@
+SET
+                     libro                     |        categoria        |        concepto         | modelo_cloud |       clasificador        |      fecha_clasificacion      
+-----------------------------------------------+-------------------------+-------------------------+--------------+---------------------------+-------------------------------
+ Fundamentos de Sistemas de Bases de Datos     | Bases de Datos          | Normalizacion           | IaaS         | ana.torres@example.com    | 2026-09-03 05:17:12.39003+00
+ Redes de Computadoras: Un Enfoque Descendente | Redes y Comunicaciones  | Protocolo TCP/IP        | PaaS         | ana.torres@example.com    | 2026-09-03 05:17:12.395511+00
+ Clean Code                                    | Ingenieria de Software  | Principios SOLID        | SaaS         | ana.torres@example.com    | 2026-09-03 05:17:12.399872+00
+ Deep Learning                                 | Inteligencia Artificial | Redes Neuronales        | FaaS         | ana.torres@example.com    | 2026-09-03 05:17:12.405058+00
+ Deep Learning                                 | Inteligencia Artificial | Aprendizaje Supervisado | N/A          | ana.torres@example.com    | 2026-09-03 05:17:12.409943+00
+ Redes de Computadoras: Un Enfoque Descendente | Redes y Comunicaciones  | Protocolo TCP/IP        | IaaS         | carlos.mendez@example.com | 2026-09-03 05:17:12.430867+00
+(6 rows)
+

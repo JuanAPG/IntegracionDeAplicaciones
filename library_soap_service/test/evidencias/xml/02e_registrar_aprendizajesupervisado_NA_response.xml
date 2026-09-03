@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:clv="urn:library:clasificacion:1.0" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Header /><soap:Body><clv:RegistrarClasificacionResponse><clv:exito>true</clv:exito><clv:mensaje>Clasificacion guardada exitosamente.</clv:mensaje></clv:RegistrarClasificacionResponse></soap:Body></soap:Envelope>

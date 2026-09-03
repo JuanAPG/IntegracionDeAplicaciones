@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:clv="urn:library:clasificacion:1.0" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Header><clv:ClienteInfo><clv:tipo_cliente>Java-Swing-Clasificador</clv:tipo_cliente><clv:identificador>carlos.desktop@lab-02</clv:identificador></clv:ClienteInfo></soap:Header><soap:Body><clv:ObtenerConceptosPendientesRequest><clv:clasificador_email>carlos.mendez@example.com</clv:clasificador_email><clv:limite>10</clv:limite></clv:ObtenerConceptosPendientesRequest></soap:Body></soap:Envelope>
