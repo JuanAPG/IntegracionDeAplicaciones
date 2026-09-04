@@ -1,0 +1,13 @@
+Endpoint: http://127.0.0.1:5099/soap/clasificacion
+
+=== ObtenerConceptosPendientes ===
+  - Normalizacion  (Fundamentos de Sistemas de Bases de Datos / Tecnico)  isbn=978-0133970777
+
+=== RegistrarClasificacion (valido) ===
+  exito=true  mensaje=Clasificacion guardada exitosamente.
+
+=== RegistrarClasificacion (repetido: mismo clasificador/concepto) ===
+  (sin parsear como SOAP Fault -- ver nota de interoperabilidad) com.sun.xml.ws.client.ClientTransportException: The server sent HTTP status code 409: CONFLICT
+
+=== Modelo invalido: el propio cliente tipado ya lo rechaza ===
+  Rechazado localmente por el cliente generado: java.lang.IllegalArgumentException: Blockchain

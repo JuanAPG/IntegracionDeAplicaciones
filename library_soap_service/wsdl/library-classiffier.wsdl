@@ -331,7 +331,7 @@
          ================================================================ -->
     <service name="ClasificacionLibrosService">
         <port name="ClasificacionLibrosPort" binding="tns:ClasificacionLibrosBinding">
-            <soap:address location="http://34.51.88.26:5000/soap/clasificacion"/>
+            <soap:address location="http://34.51.88.192:5000/soap/clasificacion"/>
         </port>
     </service>
 
