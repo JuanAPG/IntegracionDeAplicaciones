@@ -71,6 +71,56 @@ def collection_to_dict(rows, total, limit, offset, filters=None):
 
 
 # ---------------------------------------------------------------------
+# Conceptos de computo en la nube (GET /cloud-concepts)
+#
+# La unidad es la CLASIFICACION: "el concepto C, definido en el libro L,
+# quedo clasificado como modelo M". Por eso el libro va anidado dentro
+# del concepto y no al reves, y se emite completo con book_to_dict /
+# book_element: el <book> de aqui es identico al de GET /books/{id}, sin
+# una segunda forma de representar un libro que mantener en paralelo.
+# ---------------------------------------------------------------------
+def cloud_concept_to_dict(row, book_row):
+    return {
+        "ref": row["concepto_id"],
+        "name": row["concepto_nombre"],
+        "definition": row["concepto_definicion"],
+        "classification": {
+            "id": row["clasificacion_id"],
+            "model": row["modelo_cloud"],
+            "classifiedBy": row["clasificador_email"],
+            "classifierName": row["clasificador_nombre"],
+            "classifiedAt": _iso(row["fecha_clasificacion"]),
+        },
+        "book": book_to_dict(book_row) if book_row else {
+            "isbn": row["libro_isbn"], "title": row["libro_titulo"]},
+    }
+
+
+def cloud_concepts_to_dict(groups, total, limit, offset, filters=None):
+    return {
+        "library": {
+            "version": config.XML_VERSION,
+            "generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "source": config.PGDATABASE,
+            "schema": config.PGSCHEMA,
+        },
+        "count": sum(len(items) for _, items in groups),
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "filters": filters or {},
+        # groups tiene la misma forma que en cloud_concepts_element:
+        # [(modelo, [(fila, fila_del_libro), ...]), ...]
+        "cloudModels": [
+            {"model": model,
+             "count": len(items),
+             "concepts": [cloud_concept_to_dict(row, book_row) for row, book_row in items]}
+            for model, items in groups
+        ],
+    }
+
+
+# ---------------------------------------------------------------------
 # XML
 # ---------------------------------------------------------------------
 def _sub(parent, tag, text=None, **attrs):
@@ -138,6 +188,44 @@ def library_element(rows, total=None, limit=None, offset=None):
     books = ElementTree.SubElement(root, "books", attrs)
     for row in rows:
         book_element(row, parent=books)
+    return root
+
+
+def cloud_concepts_element(groups, total=None, limit=None, offset=None):
+    """
+    <cloudConcepts> agrupado por modelo de servicio. Cada <concept> lleva
+    dentro el <book> completo, con el mismo diseno de library.xml.
+    """
+    root = ElementTree.Element("cloudConcepts", {
+        "xmlns": NS,
+        "version": config.XML_VERSION,
+        "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "source": config.PGDATABASE,
+        "schema": config.PGSCHEMA,
+        "count": str(sum(len(items) for _, items in groups)),
+    })
+    for name, value in (("total", total), ("limit", limit), ("offset", offset)):
+        if value is not None:
+            root.set(name, str(value))
+
+    for model, items in groups:
+        model_node = _sub(root, "model", count=len(items), name=model)
+        for row, book_row in items:
+            concept = _sub(model_node, "concept", ref=row["concepto_id"])
+            _sub(concept, "name", row["concepto_nombre"])
+            # (book, concept) -> definition: puede no existir si la
+            # clasificacion apunta a un par que no esta en book_concepts.
+            if row["concepto_definicion"] is not None:
+                _sub(concept, "definition", row["concepto_definicion"])
+            classification = _sub(concept, "classification",
+                                  id=row["clasificacion_id"], model=row["modelo_cloud"])
+            _sub(classification, "classifiedBy", row["clasificador_email"])
+            _sub(classification, "classifierName", row["clasificador_nombre"])
+            _sub(classification, "classifiedAt", _iso(row["fecha_clasificacion"]))
+            if book_row is not None:
+                book_element(book_row, parent=concept)
+            else:
+                _sub(concept, "book", row["libro_titulo"], isbn=row["libro_isbn"])
     return root
 
 

@@ -440,3 +440,93 @@ LANGUAGE sql STABLE AS $$
      GROUP BY m.modelo
      ORDER BY array_position(ARRAY['IaaS', 'PaaS', 'SaaS', 'FaaS'], m.modelo);
 $$;
+
+
+-- =====================================================================
+-- VISTA: v_conceptos_cloud
+--
+-- Modelo de lectura para el endpoint GET /cloud-concepts: cada fila es
+-- UNA clasificacion ya registrada -- "el concepto C, definido en el
+-- libro L, quedo clasificado como modelo M por el clasificador X".
+--
+-- Mismo criterio que v_conceptos_catalogo: el modelo normalizado sigue
+-- siendo la verdad y la vista solo es la forma comoda de leerlo, para no
+-- repetir este JOIN en cada funcion.
+--
+-- El JOIN con book_concepts es LEFT y no INNER a proposito. Las dos
+-- claves foraneas de clasificaciones_cloud son independientes
+-- (concepto_id -> concepts, libro_isbn -> books): nada en el modelo
+-- obliga a que ese par exista ademas en book_concepts. Si no existe, la
+-- clasificacion es igual de valida y debe aparecer, solo que sin
+-- definicion (concepto_definicion = NULL). Con INNER JOIN se perderia
+-- la fila en silencio.
+-- =====================================================================
+CREATE OR REPLACE VIEW library.v_conceptos_cloud AS
+SELECT cc.id                  AS clasificacion_id,
+       cc.modelo_cloud        AS modelo_cloud,
+       k.id                   AS concepto_id,
+       k.name                 AS concepto_nombre,
+       bk.definition          AS concepto_definicion,
+       b.id                   AS libro_id,
+       b.isbn                 AS libro_isbn,
+       b.title                AS libro_titulo,
+       cl.email               AS clasificador_email,
+       cl.nombre              AS clasificador_nombre,
+       cc.fecha_clasificacion AS fecha_clasificacion
+  FROM library.clasificaciones_cloud cc
+  JOIN library.concepts       k  ON k.id   = cc.concepto_id
+  JOIN library.books          b  ON b.isbn = cc.libro_isbn
+  JOIN library.clasificadores cl ON cl.id  = cc.clasificador_id
+  LEFT JOIN library.book_concepts bk
+         ON bk.book_id = b.id AND bk.concept_id = cc.concepto_id;
+
+
+-- ---------------------------------------------------------------------
+-- sp_conceptos_cloud
+-- Backend de GET /cloud-concepts. Devuelve las clasificaciones Cloud con
+-- la referencia al libro; la capa Python completa cada libro con su
+-- agregado (autores, generos, imagenes) reutilizando books_repository,
+-- para que el <book> de esta respuesta sea identico al de GET /books/{id}.
+--
+-- p_modelo NULL = los cuatro modelos (mas N/A si hay filas). Con valor,
+-- filtra por ese modelo; la validacion de que el valor este en catalogo
+-- ocurre antes, en la capa Python, para responder 400 sin ir a la base.
+--
+-- total_general viaja como columna calculada con count(*) OVER (): el
+-- total que cumple el filtro ANTES de LIMIT/OFFSET, en la misma pasada,
+-- sin una segunda consulta de conteo.
+--
+-- El ORDER BY por array_position deja siempre el orden logico de los
+-- modelos (IaaS, PaaS, SaaS, FaaS, N/A) y no el alfabetico, que pondria
+-- FaaS primero.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION library.sp_conceptos_cloud(
+    p_modelo VARCHAR DEFAULT NULL,
+    p_limite INTEGER DEFAULT 200,
+    p_offset INTEGER DEFAULT 0
+) RETURNS TABLE (
+    total_general       BIGINT,
+    clasificacion_id    BIGINT,
+    modelo_cloud        VARCHAR,
+    concepto_id         INTEGER,
+    concepto_nombre     VARCHAR,
+    concepto_definicion TEXT,
+    libro_id            INTEGER,
+    libro_isbn          VARCHAR,
+    libro_titulo        VARCHAR,
+    clasificador_email  VARCHAR,
+    clasificador_nombre VARCHAR,
+    fecha_clasificacion TIMESTAMPTZ
+)
+LANGUAGE sql STABLE AS $$
+    SELECT count(*) OVER ()::BIGINT,
+           v.clasificacion_id, v.modelo_cloud,
+           v.concepto_id, v.concepto_nombre, v.concepto_definicion,
+           v.libro_id, v.libro_isbn, v.libro_titulo,
+           v.clasificador_email, v.clasificador_nombre, v.fecha_clasificacion
+      FROM library.v_conceptos_cloud v
+     WHERE p_modelo IS NULL OR v.modelo_cloud = p_modelo
+     ORDER BY array_position(ARRAY['IaaS', 'PaaS', 'SaaS', 'FaaS', 'N/A'], v.modelo_cloud),
+              v.concepto_nombre, v.libro_titulo
+     LIMIT p_limite OFFSET p_offset;
+$$;

@@ -26,6 +26,7 @@ import config
 import db
 import openapi
 import serializers
+import clasificacion_repository as clasif_repo
 import soap_endpoint
 from errors import ApiError, ValidationError
 from payloads import read_book_payload
@@ -225,6 +226,8 @@ def index():
             {"method": "GET", "path": f"{API}/genres", "description": "Catalogo de generos"},
             {"method": "GET", "path": f"{API}/authors", "description": "Catalogo de autores"},
             {"method": "GET", "path": f"{API}/concepts", "description": "Catalogo de conceptos"},
+            {"method": "GET", "path": f"{API}/cloud-concepts",
+             "description": "Conceptos clasificados por modelo de nube (IaaS/PaaS/SaaS/FaaS) con su libro"},
             {"method": "POST", "path": config.SOAP_ENDPOINT_PATH,
              "description": "Modulo SOAP 1.1 de clasificacion en la nube (ver wsdl/library-classiffier.wsdl)"},
         ],
@@ -341,6 +344,51 @@ def list_authors():
 @app.get(f"{API}/concepts")
 def list_concepts():
     return _catalog_response("concepts", "concept")
+
+
+# =====================================================================
+# Ruta: conceptos de computo en la nube
+#
+# Devuelve los conceptos ya clasificados en un modelo de servicio (IaaS,
+# PaaS, SaaS, FaaS) junto con el libro completo en el que estan
+# definidos. Los datos los alimenta el modulo SOAP de clasificacion
+# (POST /soap/clasificacion, tabla clasificaciones_cloud); este endpoint
+# es la cara de LECTURA de esa informacion para clientes que hablan
+# JSON/XML en vez de SOAP.
+#
+# Los cuatro modelos aparecen SIEMPRE, con count="0" si aun no tienen
+# clasificaciones, para que la forma de la respuesta no dependa de los
+# datos -- mismo criterio que sp_estadisticas_por_modelo. "N/A" es la
+# excepcion: solo sale si hay filas, porque no es un modelo de nube sino
+# la marca de "este concepto no es de la nube".
+# =====================================================================
+@app.get(f"{API}/cloud-concepts")
+def list_cloud_concepts():
+    limit, offset = _pagination()
+    modelo = (request.args.get("model") or "").strip() or None
+    rows, total = clasif_repo.conceptos_cloud(modelo, limite=limit, offset=offset)
+
+    # Un solo viaje a la base por todos los libros implicados, en lugar de
+    # uno por clasificacion (ver books_repository.get_books_by_ids).
+    books = repo.get_books_by_ids([row["libro_id"] for row in rows])
+
+    # Se siembran primero los modelos que deben salir aunque no tengan
+    # filas (los cuatro, o solo el pedido si se filtro), y despues se
+    # agregan los que aparezcan en los datos -- "N/A", en la practica.
+    semilla = [modelo] if modelo else list(clasif_repo.MODELOS_CLOUD)
+    agrupado = {m: [] for m in semilla}
+    for row in rows:
+        agrupado.setdefault(row["modelo_cloud"], [])
+    for row in rows:
+        agrupado[row["modelo_cloud"]].append((row, books.get(row["libro_id"])))
+
+    orden = {m: i for i, m in enumerate(clasif_repo.MODELOS_SERVICIO_VALIDOS)}
+    groups = sorted(agrupado.items(), key=lambda kv: orden.get(kv[0], len(orden)))
+
+    filters = {"model": modelo} if modelo else {}
+    payload = serializers.cloud_concepts_to_dict(groups, total, limit, offset, filters)
+    element = serializers.cloud_concepts_element(groups, total, limit, offset)
+    return respond(payload, element, headers={"X-Total-Count": str(total)})
 
 
 # =====================================================================

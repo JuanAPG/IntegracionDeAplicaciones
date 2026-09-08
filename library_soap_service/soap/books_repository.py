@@ -214,6 +214,23 @@ def get_book(book_id):
     return dict(row)
 
 
+def get_books_by_ids(ids):
+    """
+    Varios libros completos en UNA sola consulta, indexados por id.
+
+    Existe para que un consumidor que ya sabe que libros necesita (por
+    ejemplo /cloud-concepts, que parte de las clasificaciones) no tenga
+    que llamar a get_book() una vez por libro: eso seria un N+1 contra la
+    base y, con json_agg de por medio, cuatro subconsultas por vuelta.
+    """
+    ids = list(dict.fromkeys(ids))          # unicos, conservando el orden
+    if not ids:
+        return {}
+    with db.cursor() as cur:
+        cur.execute(f"SELECT {BOOK_COLUMNS} {FROM_BOOKS} WHERE b.id = ANY(%s)", (ids,))
+        return {row["id"]: row for row in cur.fetchall()}
+
+
 def get_book_by_isbn(isbn):
     with db.cursor() as cur:
         cur.execute(f"SELECT {BOOK_COLUMNS} {FROM_BOOKS} WHERE b.isbn = %s", (isbn,))

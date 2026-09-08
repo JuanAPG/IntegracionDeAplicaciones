@@ -33,6 +33,11 @@ from errors import Conflict, NotFound, ValidationError
 
 MODELOS_SERVICIO_VALIDOS = ("IaaS", "PaaS", "SaaS", "FaaS", "N/A")
 
+# Los cuatro modelos de servicio en la nube propiamente dichos. "N/A" queda
+# fuera a proposito -- es la marca de "este concepto no es de computo en la
+# nube", no un modelo -- igual que en sp_estadisticas_por_modelo.
+MODELOS_CLOUD = ("IaaS", "PaaS", "SaaS", "FaaS")
+
 # codigo_error que puede devolver sp_registrar_clasificacion (ver
 # soap_module.sql) -> (clase de excepcion, codigo legible para el Fault).
 _ERRORES_REGISTRO = {
@@ -118,3 +123,39 @@ def estadisticas_por_modelo():
         cur.execute("SELECT * FROM library.sp_estadisticas_por_modelo()")
         rows = cur.fetchall()
     return {row["modelo_servicio"]: row["total"] for row in rows}
+
+
+def conceptos_cloud(modelo=None, limite=200, offset=0):
+    """
+    Clasificaciones Cloud registradas, con la referencia a su libro.
+    Devuelve (filas, total), donde total es cuantas cumplen el filtro
+    antes de aplicar limite/offset.
+
+    El modelo se valida aqui, sin ir a la base, para responder 400 a un
+    valor fuera de catalogo sin abrir una transaccion -- mismo criterio
+    que registrar_clasificacion. Se aceptan los cuatro modelos y tambien
+    "N/A", por si se quieren revisar los conceptos marcados como ajenos
+    a la nube.
+    """
+    if modelo is not None:
+        # Sin distinguir mayusculas, igual que los filtros 'format' y
+        # 'category' de la API de libros (lower(name) = lower(%s)): quien
+        # escribe ?model=iaas espera IaaS. Se canoniza antes de consultar
+        # porque la columna guarda exactamente 'IaaS', 'PaaS', ...
+        canonico = {m.lower(): m for m in MODELOS_SERVICIO_VALIDOS}
+        if modelo.lower() not in canonico:
+            raise ValidationError(
+                f"El modelo '{modelo}' no es valido.",
+                details=[f"Valores permitidos: {', '.join(MODELOS_SERVICIO_VALIDOS)}."],
+                code="modelo_invalido")
+        modelo = canonico[modelo.lower()]
+
+    # Solo lectura: sp_conceptos_cloud es STABLE y no escribe nada, asi que
+    # db.cursor() sin commit basta (hace rollback al salir, ver db.py).
+    with db.cursor() as cur:
+        cur.execute("SELECT * FROM library.sp_conceptos_cloud(%s, %s, %s)",
+                    (modelo, limite, offset))
+        rows = [dict(row) for row in cur.fetchall()]
+
+    total = int(rows[0]["total_general"]) if rows else 0
+    return rows, total

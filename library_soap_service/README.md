@@ -14,14 +14,15 @@ Se documenta solo: **Swagger UI en `/docs`**, especificacion OpenAPI 3.0.3 en
 
 | Operacion | Endpoint |
 |---|---|
-| Todos los libros | `GET /api/books` |
-| Un libro | `GET /api/books/{id}` — `GET /api/books/isbn/{isbn}` |
-| Buscar por atributos | `GET /api/books/search?...` |
-| Dar de alta | `POST /api/books` |
-| Modificar (reemplazo completo) | `PUT /api/books/{id}` |
-| Actualizar (cambio parcial) | `PATCH /api/books/{id}` |
-| Borrar | `DELETE /api/books/{id}` |
-| Catalogos | `GET /api/{formats\|categories\|genres\|authors\|concepts}` |
+| Todos los libros | `GET /books` |
+| Un libro | `GET /books/{id}` — `GET /books/isbn/{isbn}` |
+| Buscar por atributos | `GET /books/search?...` |
+| Dar de alta | `POST /books` |
+| Modificar (reemplazo completo) | `PUT /books/{id}` |
+| Actualizar (cambio parcial) | `PATCH /books/{id}` |
+| Borrar | `DELETE /books/{id}` |
+| Catalogos | `GET /{formats\|categories\|genres\|authors\|concepts}` |
+| Conceptos Cloud + su libro | `GET /cloud-concepts` |
 | Estado | `GET /health` |
 | Documentacion | `GET /docs` — `GET /openapi.json` |
 
@@ -86,7 +87,7 @@ python soap/app.py
 
 ```
 http://localhost:5001/docs             Swagger UI
-http://localhost:5001/api/books        catalogo completo
+http://localhost:5001/books        catalogo completo
 http://localhost:5001/health           estado de la conexion con PostgreSQL
 ```
 
@@ -99,12 +100,12 @@ que servidor se intento conectar.
 |---|---|---|
 | `HOST` / `PORT` | `0.0.0.0` / `5001` | Interfaz y puerto de escucha |
 | `DEBUG` | `false` | Recarga automatica y traza en los errores 500 |
-| `API_PREFIX` | `/api` | Prefijo de los endpoints de datos |
+| `API_PREFIX` | *(vacio)* | Prefijo de los endpoints de datos. Vacio = cuelgan de la raiz; `/api` los agrupa bajo `/api/books` |
 | `PGHOST` `PGPORT` `PGDATABASE` `PGUSER` `PGPASSWORD` | `localhost` `5432` `library_db` `library_user` — | Conexion |
 | `PGSCHEMA` | `library` | Se fija en el `search_path` de cada conexion |
 | `DB_POOL_MIN` / `DB_POOL_MAX` | `1` / `10` | Tamano del pool |
 | `CORS_ORIGINS` | `*` | Origenes permitidos, separados por comas |
-| `DEFAULT_FORMAT` | `json` | Formato cuando el cliente no pide ninguno |
+| `DEFAULT_FORMAT` | `xml` | Formato cuando el cliente no pide ninguno |
 | `CURRENCY` | `MXN` | Atributo `currency` de `<price>` |
 | `DEFAULT_LIMIT` / `MAX_LIMIT` | `50` / `200` | Paginacion |
 
@@ -120,7 +121,8 @@ El mismo recurso se entrega en los dos formatos. Prioridad:
 
 1. `?output=xml` o `?output=json`
 2. cabecera `Accept: application/xml` / `application/json`
-3. `DEFAULT_FORMAT` del `.env`
+3. `DEFAULT_FORMAT` del `.env` — **`xml`**: si el cliente no pide nada,
+   la respuesta va en XML.
 
 `?format=xml` tambien funciona, pero **`format` es ademas un filtro de
 busqueda** (el catalogo de formatos: Fisico, Digital, Audiolibro, Pasta dura).
@@ -128,11 +130,11 @@ Solo se lee como representacion cuando su valor es `xml` o `json`; con
 cualquier otro valor filtra libros. Use `output` y no hay ambiguedad.
 
 ```bash
-curl "http://localhost:5001/api/books/1"                       # JSON
-curl "http://localhost:5001/api/books/1?output=xml"            # XML
-curl -H "Accept: application/xml" "http://localhost:5001/api/books/1"
-curl "http://localhost:5001/api/books?format=Digital"          # filtro
-curl "http://localhost:5001/api/books?format=Digital&output=xml"
+curl "http://localhost:5001/books/1"                       # XML (por omision)
+curl "http://localhost:5001/books/1?output=json"           # JSON
+curl -H "Accept: application/json" "http://localhost:5001/books/1"
+curl "http://localhost:5001/books?format=Digital"          # filtro, responde XML
+curl "http://localhost:5001/books?format=Digital&output=json"
 ```
 
 El XML de un libro sale exactamente con el diseno de `library.xml`:
@@ -188,11 +190,11 @@ distinguen mayusculas (`ILIKE`).
 | `sort` `order` `limit` `offset` | orden y paginacion |
 
 ```bash
-curl "http://localhost:5001/api/books/search?author=asimov"
-curl "http://localhost:5001/api/books/search?genre=novela&price_max=400&sort=price&order=desc"
-curl "http://localhost:5001/api/books/search?concept=SOLID"
-curl "http://localhost:5001/api/books/search?category=Academico&in_stock=true"
-curl "http://localhost:5001/api/books/search?q=clean&output=xml"
+curl "http://localhost:5001/books/search?author=asimov"
+curl "http://localhost:5001/books/search?genre=novela&price_max=400&sort=price&order=desc"
+curl "http://localhost:5001/books/search?concept=SOLID"
+curl "http://localhost:5001/books/search?category=Academico&in_stock=true"
+curl "http://localhost:5001/books/search?q=clean&output=xml"
 ```
 
 La respuesta trae `total` (libros que cumplen el filtro) y la cabecera
@@ -207,10 +209,10 @@ existir en el catalogo: si no, la respuesta es `400` con la lista de valores
 validos. `authors`, `genres` y `concepts` admiten `["Nombre"]`,
 `[{"name": "..."}]` o `[{"ref": 3}]`; **si el nombre no existe, se da de alta**.
 
-**Alta** — `POST /api/books`
+**Alta** — `POST /books`
 
 ```bash
-curl -X POST http://localhost:5001/api/books \
+curl -X POST http://localhost:5001/books \
   -H "Content-Type: application/json" -d '{
     "isbn": "978-1491950357",
     "title": "Building Microservices",
@@ -232,7 +234,7 @@ Responde `201` con la cabecera `Location`. El mismo alta con el cuerpo en XML
 —una respuesta del servicio se puede reenviar tal cual como peticion:
 
 ```bash
-curl -X POST "http://localhost:5001/api/books?output=xml" \
+curl -X POST "http://localhost:5001/books?output=xml" \
   -H "Content-Type: application/xml" --data-binary '<?xml version="1.0" encoding="UTF-8"?>
 <book xmlns="urn:library:catalog:1.0" isbn="978-0596007126">
   <title>Head First Design Patterns</title>
@@ -245,18 +247,18 @@ curl -X POST "http://localhost:5001/api/books?output=xml" \
 </book>'
 ```
 
-**Modificar** — `PUT /api/books/{id}`: el cuerpo describe el libro completo.
+**Modificar** — `PUT /books/{id}`: el cuerpo describe el libro completo.
 Las cuatro colecciones se sustituyen; la que no venga **queda vacia**.
 
-**Actualizar** — `PATCH /api/books/{id}`: solo cambia lo enviado. Una coleccion
+**Actualizar** — `PATCH /books/{id}`: solo cambia lo enviado. Una coleccion
 presente se reemplaza entera; una ausente no se toca.
 
 ```bash
-curl -X PATCH http://localhost:5001/api/books/14 \
+curl -X PATCH http://localhost:5001/books/14 \
   -H "Content-Type: application/json" -d '{"price": 950.00, "stock": 3}'
 ```
 
-**Borrar** — `DELETE /api/books/{id}`. Autores, generos, conceptos e imagenes
+**Borrar** — `DELETE /books/{id}`. Autores, generos, conceptos e imagenes
 del libro caen con el por `ON DELETE CASCADE`; los catalogos no se tocan.
 
 Cada operacion de escritura ocurre dentro de **una sola transaccion**: si algo
@@ -282,7 +284,88 @@ El cuerpo del error respeta el formato pedido:
 
 ---
 
-## 8. Documentacion Swagger
+## 8. Conceptos de computo en la nube
+
+`GET /cloud-concepts` devuelve los conceptos que ya fueron clasificados en un
+modelo de servicio en la nube **junto con el libro completo** en el que estan
+definidos, agrupados por modelo.
+
+```bash
+curl "http://localhost:5001/cloud-concepts"                  # XML, los cuatro modelos
+curl "http://localhost:5001/cloud-concepts?model=IaaS"       # solo IaaS
+curl "http://localhost:5001/cloud-concepts?output=json"
+```
+
+| Parametro | Para que sirve |
+|---|---|
+| `model` | `IaaS`, `PaaS`, `SaaS`, `FaaS` o `N/A`. Sin distinguir mayusculas (`iaas` vale). Omitido = todos |
+| `limit` / `offset` | Paginacion sobre las clasificaciones, igual que en `/books` |
+| `output` | `xml` o `json` |
+
+**De donde salen los datos.** No de una tabla de conceptos "de nube": salen de
+`library.clasificaciones_cloud`, que llena el modulo SOAP cuando la app de
+escritorio ejecuta `RegistrarClasificacion`
+([`wsdl/library-classiffier.wsdl`](wsdl/library-classiffier.wsdl)). Este
+endpoint es la **cara de lectura** de esa informacion para clientes que hablan
+JSON/XML en vez de SOAP. Si todavia nadie ha clasificado nada, los cuatro
+modelos salen igual con `count="0"`: la forma de la respuesta no depende de los
+datos.
+
+**El `<book>` anidado es el mismo de `GET /books/{id}`**, con el diseno de
+`library.xml` completo (autores, generos, conceptos, imagenes). Se emite con el
+mismo serializador, de modo que no hay dos representaciones de un libro que
+mantener en paralelo.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<cloudConcepts xmlns="urn:library:catalog:1.0" version="1.0"
+               generatedAt="2026-09-08T21:32:36Z" source="library_db" schema="library"
+               count="3" total="3" limit="50" offset="0">
+  <model count="1" name="IaaS">
+    <concept ref="7">
+      <name>Virtualizacion</name>
+      <definition>Abstraccion del hardware fisico en recursos logicos.</definition>
+      <classification id="1" model="IaaS">
+        <classifiedBy>alumno@udem.mx</classifiedBy>
+        <classifierName>Juan Perez</classifierName>
+        <classifiedAt>2026-03-04T12:00:00-06:00</classifiedAt>
+      </classification>
+      <book id="3" isbn="978-0133970777">
+        <title>Fundamentos de Sistemas de Bases de Datos</title>
+        ...
+      </book>
+    </concept>
+  </model>
+  <model count="0" name="PaaS" />
+  ...
+</cloudConcepts>
+```
+
+Detalles que conviene conocer:
+
+* **La unidad es la clasificacion, no el concepto.** Un mismo concepto aparece
+  tantas veces como veces se haya clasificado (un par libro-concepto distinto,
+  o un clasificador distinto). Por eso el libro va dentro del concepto.
+* **`<definition>` puede faltar.** Las dos claves foraneas de
+  `clasificaciones_cloud` son independientes (`concepto_id -> concepts`,
+  `libro_isbn -> books`): nada obliga a que ese par exista ademas en
+  `book_concepts`. Cuando no existe, la clasificacion es valida y aparece, solo
+  que sin definicion.
+* **`N/A` solo aparece si hay filas**, porque no es un modelo de nube sino la
+  marca de "este concepto no es de computo en la nube" -- mismo criterio que
+  `ObtenerEstadisticasPorModelo`.
+* **Un `model` fuera de catalogo responde `400`** antes de tocar la base, con la
+  lista de valores validos en `details`.
+* Cabecera `X-Total-Count` con el total que cumple el filtro.
+
+**Requisito**: el modulo SOAP debe estar cargado en la base
+(`psql -U library_user -d library_db -f sql/soap_module.sql`), que es donde
+viven la vista `v_conceptos_cloud` y la funcion `sp_conceptos_cloud` que
+respaldan este endpoint.
+
+---
+
+## 9. Documentacion Swagger
 
 * **`/docs`** — Swagger UI, con *Try it out* contra este mismo servicio.
 * **`/openapi.json`** — el documento OpenAPI 3.0.3.
@@ -304,7 +387,7 @@ URL publica.
 
 ---
 
-## 9. Pruebas
+## 10. Pruebas
 
 ```bash
 ./scripts/pruebas.sh                        # contra http://localhost:5001
@@ -317,12 +400,12 @@ terminar, de modo que deja la base como la encontro.
 
 ---
 
-## 10. Despliegue en CentOS 10 Stream
+## 11. Despliegue en CentOS 10 Stream
 
 Se asume PostgreSQL ya instalado, con `library_user` / `library_db` cargados
 (seccion 6.2 y 6.6 de [`../apps/web_monolito/README.md`](../apps/web_monolito/README.md)).
 
-### 10.1 Python y el codigo
+### 11.1 Python y el codigo
 
 ```bash
 sudo dnf install -y python3 python3-pip
@@ -337,7 +420,7 @@ sudo -u library python3 -m venv /opt/library/soap/.venv
 sudo -u library /opt/library/soap/.venv/bin/pip install -r /opt/library/soap/requirements.txt
 ```
 
-### 10.2 Configuracion
+### 11.2 Configuracion
 
 ```bash
 sudo -u library cp /opt/library/soap/.env.example /opt/library/soap/.env
@@ -352,7 +435,7 @@ CORS_ORIGINS=https://libreria.ejemplo.mx,https://admin.ejemplo.mx
 DEBUG=false
 ```
 
-### 10.3 Servicio systemd
+### 11.3 Servicio systemd
 
 ```bash
 sudo tee /etc/systemd/system/library-soap.service > /dev/null <<'EOF'
@@ -391,7 +474,7 @@ sudo systemctl status library-soap
 (el servidor de desarrollo de Flask) si lo lee, pero no debe usarse en
 produccion.
 
-### 10.4 Proxy inverso
+### 11.4 Proxy inverso
 
 Con **nginx**:
 
@@ -424,7 +507,7 @@ sudo setsebool -P httpd_can_network_connect 1
 **No anada cabeceras CORS en el proxy.** Ya las emite Flask; duplicar
 `Access-Control-Allow-Origin` hace que el navegador rechace la respuesta.
 
-### 10.5 Firewall
+### 11.5 Firewall
 
 ```bash
 # Con proxy inverso (recomendado): solo 80/443
@@ -434,17 +517,17 @@ sudo firewall-cmd --permanent --add-port=5001/tcp
 sudo firewall-cmd --reload
 ```
 
-### 10.6 Verificacion
+### 11.6 Verificacion
 
 ```bash
 curl -s http://localhost:5001/health
-curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5001/api/books
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5001/books
 sudo journalctl -u library-soap -f
 ```
 
 ---
 
-## 11. Problemas frecuentes
+## 12. Problemas frecuentes
 
 | Sintoma | Causa habitual |
 |---|---|
@@ -457,7 +540,7 @@ sudo journalctl -u library-soap -f
 
 ---
 
-## 12. Seguridad
+## 13. Seguridad
 
 * El `.env` **no se publica**: esta en `library_soap_service/.gitignore`.
   Compruebelo con `git ls-files | grep -i "\.env"` — solo debe salir

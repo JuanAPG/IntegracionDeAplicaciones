@@ -35,8 +35,11 @@ HOST = os.getenv("HOST", "0.0.0.0")
 PORT = _int("PORT", 5001)
 DEBUG = _bool("DEBUG", False)
 
-# Prefijo bajo el que se montan todos los endpoints de datos.
-API_PREFIX = os.getenv("API_PREFIX", "/api").rstrip("/")
+# Prefijo bajo el que se montan todos los endpoints de datos. Vacio por
+# omision: los recursos cuelgan de la raiz (/books, /formats, ...). Si un
+# despliegue necesita agruparlos, basta con poner API_PREFIX=/api en el
+# .env; app.py y openapi.py derivan todas sus rutas de este valor.
+API_PREFIX = os.getenv("API_PREFIX", "").rstrip("/")
 
 # ---------------------------------------------------------------------
 # PostgreSQL
@@ -63,7 +66,7 @@ CORS_MAX_AGE = _int("CORS_MAX_AGE", 86400)
 # Representacion
 # ---------------------------------------------------------------------
 # Formato de salida cuando el cliente no pide ninguno (?format= / Accept).
-DEFAULT_FORMAT = os.getenv("DEFAULT_FORMAT", "json").lower()
+DEFAULT_FORMAT = os.getenv("DEFAULT_FORMAT", "xml").lower()
 # Moneda que se anota en el atributo currency de <price>.
 CURRENCY = os.getenv("CURRENCY", "MXN")
 # Espacio de nombres del XML: el mismo de apps/services/soap/library.xml

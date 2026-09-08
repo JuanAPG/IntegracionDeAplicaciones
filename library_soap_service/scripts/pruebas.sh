@@ -13,7 +13,9 @@
 set -uo pipefail
 
 BASE="${BASE:-http://localhost:5001}"
-API="$BASE/api"
+# Los recursos cuelgan de la raiz. Si el despliegue usa API_PREFIX, pase el
+# mismo valor aqui:  API_PREFIX=/api ./scripts/pruebas.sh
+API="$BASE${API_PREFIX:-}"
 ISBN_PRUEBA="978-9999999999"
 
 ok=0

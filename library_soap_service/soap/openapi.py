@@ -308,6 +308,56 @@ def _schemas():
                                            "o concepts."},
             },
         },
+        "CloudConcept": {
+            "type": "object",
+            "xml": {"name": "concept"},
+            "properties": {
+                "ref": {"type": "integer", "example": 7,
+                        "description": "id del concepto en el catalogo."},
+                "name": {"type": "string", "example": "Virtualizacion"},
+                "definition": {"type": "string", "nullable": True,
+                               "description": "Definicion del concepto EN ESE LIBRO. Ausente "
+                                              "si la clasificacion apunta a un par "
+                                              "libro-concepto que no esta en book_concepts."},
+                "classification": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer", "example": 12},
+                        "model": {"type": "string", "enum": ["IaaS", "PaaS", "SaaS", "FaaS", "N/A"]},
+                        "classifiedBy": {"type": "string", "example": "alumno@udem.mx"},
+                        "classifierName": {"type": "string", "example": "Juan Perez"},
+                        "classifiedAt": {"type": "string", "format": "date-time"},
+                    },
+                },
+                "book": {"$ref": "#/components/schemas/Book"},
+            },
+        },
+        "CloudConceptList": {
+            "type": "object",
+            "xml": {"name": "cloudConcepts", "namespace": NS},
+            "properties": {
+                "count": {"type": "integer", "description": "Clasificaciones en esta pagina."},
+                "total": {"type": "integer", "description": "Clasificaciones que cumplen el filtro."},
+                "limit": {"type": "integer"},
+                "offset": {"type": "integer"},
+                "cloudModels": {
+                    "type": "array",
+                    "description": "Los cuatro modelos aparecen siempre, con count 0 si aun "
+                                   "no tienen clasificaciones. 'N/A' solo aparece si hay filas.",
+                    "items": {
+                        "type": "object",
+                        "xml": {"name": "model"},
+                        "properties": {
+                            "model": {"type": "string",
+                                      "enum": ["IaaS", "PaaS", "SaaS", "FaaS", "N/A"]},
+                            "count": {"type": "integer"},
+                            "concepts": {"type": "array",
+                                         "items": {"$ref": "#/components/schemas/CloudConcept"}},
+                        },
+                    },
+                },
+            },
+        },
         "Health": {
             "type": "object",
             "xml": {"name": "health", "namespace": NS},
@@ -361,6 +411,12 @@ def _parameters():
         "Output": _query(
             "output", "Formato de la respuesta. Tiene prioridad sobre la cabecera Accept.",
             {"type": "string", "enum": ["json", "xml"]}),
+        "CloudModel": _query(
+            "model",
+            "Filtra por un modelo de servicio. Sin distinguir mayusculas: "
+            "`iaas` e `IaaS` son equivalentes. Omitido = los cuatro modelos.",
+            {"type": "string", "enum": ["IaaS", "PaaS", "SaaS", "FaaS", "N/A"]},
+            example="IaaS"),
         "Limit": _query("limit", f"Libros por pagina (maximo {config.MAX_LIMIT}).",
                         {"type": "integer", "default": config.DEFAULT_LIMIT,
                          "minimum": 1, "maximum": config.MAX_LIMIT}),
@@ -668,6 +724,34 @@ def _paths():
                 "503": {"$ref": "#/components/responses/DatabaseUnavailable"},
             },
         }},
+        f"{API}/cloud-concepts": {"get": {
+            "tags": ["Computo en la nube"],
+            "summary": "Conceptos clasificados por modelo de nube, con su libro",
+            "description":
+                "Devuelve los conceptos que ya fueron clasificados en un modelo de servicio "
+                "en la nube (IaaS, PaaS, SaaS, FaaS) **junto con el libro completo** en el "
+                "que estan definidos, agrupados por modelo.\n\n"
+                "El `book` anidado es exactamente el mismo recurso que devuelve "
+                "`GET /books/{book_id}`.\n\n"
+                "Los datos los alimenta el modulo SOAP de clasificacion "
+                "(`POST /soap/clasificacion`, operacion `RegistrarClasificacion`): este "
+                "endpoint es la cara de lectura de esa informacion para clientes que hablan "
+                "JSON/XML en vez de SOAP. Si aun no se ha clasificado nada, los cuatro "
+                "modelos salen con `count` 0.",
+            "parameters": [{"$ref": "#/components/parameters/CloudModel"},
+                           {"$ref": "#/components/parameters/Limit"},
+                           {"$ref": "#/components/parameters/Offset"},
+                           {"$ref": "#/components/parameters/Output"}],
+            "responses": {
+                "200": {"description": "Conceptos agrupados por modelo de servicio.",
+                        "headers": {"X-Total-Count": {
+                            "description": "Clasificaciones que cumplen el filtro.",
+                            "schema": {"type": "integer"}}},
+                        "content": _both("#/components/schemas/CloudConceptList", None)},
+                "400": {"$ref": "#/components/responses/ValidationError"},
+                "503": {"$ref": "#/components/responses/DatabaseUnavailable"},
+            },
+        }},
         f"{API}/formats": catalog_path("formats", "formatos"),
         f"{API}/categories": catalog_path("categories", "categorias"),
         f"{API}/genres": catalog_path("genres", "generos"),
@@ -695,6 +779,9 @@ def build_spec():
             {"name": "Libros", "description": "Operaciones CRUD y busqueda por atributos."},
             {"name": "Catalogos", "description": "Valores validos de formato, categoria, "
                                                  "genero, autor y concepto."},
+            {"name": "Computo en la nube",
+             "description": "Lectura de los conceptos clasificados en modelos de servicio "
+                            "(IaaS/PaaS/SaaS/FaaS) por el modulo SOAP."},
             {"name": "Servicio", "description": "Indice y estado."},
         ],
         "paths": _paths(),
