@@ -108,8 +108,8 @@ esperado_http "registro JSON es 201" 201 -X POST "$BASE/register?format=json" \
          \"password\": \"Secreto123\"}"
 contiene "el registro pide verificar" '"required": true' -X POST "$BASE/register?format=json" \
     -H "Content-Type: application/json" \
-    -d '{"nombre": "Otro", "email": "otro@ejemplo.local", "password": "Secreto123"}' \
-    || true
+    -d '{"nombre": "Otro", "apellidoPaterno": "Registro", "apellidoMaterno": "VM",
+         "email": "otro@ejemplo.local", "password": "Secreto123"}'
 psql_cmd "DELETE FROM library.users WHERE lower(email) = 'otro@ejemplo.local';" >/dev/null 2>&1 || true
 contiene "el registro por omision es XML" '<registration' -X POST "$BASE/register" \
     -H "Content-Type: application/json" \
