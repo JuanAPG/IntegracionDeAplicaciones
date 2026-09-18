@@ -1,0 +1,17 @@
+# Microservicio de autenticacion (Flask + Psycopg 3 + PostgreSQL)
+#
+#   python3 -m venv .venv
+#   source .venv/bin/activate
+#   pip install -r requirements.txt
+#
+# Despliegue en la instancia CentOS: ver README.md.
+Flask>=3.0,<4
+Flask-Cors>=4.0,<7
+psycopg[binary,pool]>=3.1,<4
+bcrypt>=4.0,<6
+python-dotenv>=1.0,<2
+gunicorn>=21.2
+
+# Documentacion: publica /openapi.json y la interfaz Swagger UI en /docs.
+# Trae los archivos de Swagger UI en el propio paquete (funciona sin Internet).
+flasgger>=0.9.7

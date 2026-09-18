@@ -1,0 +1,64 @@
+"""
+apps/services/login/login/errors.py
+Excepciones de la API. app.py las traduce a una respuesta (JSON o XML)
+con el codigo HTTP correspondiente.
+"""
+
+
+class ApiError(Exception):
+    status = 400
+    code = "bad_request"
+
+    def __init__(self, message, details=None, status=None, code=None):
+        super().__init__(message)
+        self.message = message
+        self.details = list(details) if details else []
+        if status is not None:
+            self.status = status
+        if code is not None:
+            self.code = code
+
+
+class ValidationError(ApiError):
+    status = 400
+    code = "validation_error"
+
+
+class Unauthorized(ApiError):
+    status = 401
+    code = "unauthorized"
+
+
+class EmailNotVerified(ApiError):
+    status = 403
+    code = "email_not_verified"
+
+
+class Forbidden(ApiError):
+    status = 403
+    code = "forbidden"
+
+
+class NotFound(ApiError):
+    status = 404
+    code = "not_found"
+
+
+class Conflict(ApiError):
+    status = 409
+    code = "conflict"
+
+
+class Gone(ApiError):
+    status = 410
+    code = "gone"
+
+
+class UnsupportedMedia(ApiError):
+    status = 415
+    code = "unsupported_media_type"
+
+
+class MailerError(ApiError):
+    status = 503
+    code = "mailer_unavailable"

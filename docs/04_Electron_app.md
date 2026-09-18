@@ -1,0 +1,3 @@
+1. Escribve una aplicacipn de escritorio para MacOS ARM  que muestre el catalogo de libros con su ISBN, título, autor, año de publicación, género, precio, stock, formato, imágenes y conceptos definidos por libro. Implementa paginación y carga por petición. Depositala en /apps/Electron_app
+2. La aplicacion de escritorio para MacOS ARM con electron, debe consumir EXCLUSIVAMENTE xml provisto por el microservicio disponible en http://34.51.18.197:5001, pero la URL y el endpoint deben de ser configurables en la aplicación. Esta configuracion debe de persistir mediante el uso de lcoalStorage. 
+3. Incluye los pasos para ejecutar la aplicacion en Windows 11 mediante la creación de un archivo README.md

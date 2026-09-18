@@ -1,0 +1,17 @@
+{
+  "name": "library-electron-app",
+  "productName": "Libreria en Linea",
+  "version": "1.0.0",
+  "description": "Aplicacion de escritorio (Electron) que muestra el catalogo de libros consumiendo exclusivamente XML del microservicio Flask.",
+  "main": "main.js",
+  "author": "UDEM - Integracion de Sistemas",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "devDependencies": {
+    "electron": "^40.0.0"
+  }
+}
