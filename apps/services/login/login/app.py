@@ -483,4 +483,7 @@ if __name__ == "__main__":
              config.PGUSER, config.PGHOST, config.PGPORT, config.PGDATABASE, config.PGSCHEMA)
     log.info("sendmail -> %s:%s (remitente %s)", config.SMTP_HOST, config.SMTP_PORT, config.SMTP_FROM)
     log.info("CORS origins -> %s", ", ".join(config.CORS_ORIGINS))
-    app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)
+    # load_dotenv=False: config.py ya cargo el .env por ruta absoluta; el
+    # autoload de Flask resuelve desde el cwd y falla si este fue borrado.
+    app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG,
+            load_dotenv=False)
