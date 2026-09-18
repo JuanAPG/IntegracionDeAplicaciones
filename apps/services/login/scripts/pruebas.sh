@@ -47,9 +47,21 @@ esperado_http() {
 }
 
 # contiene <descripcion> <texto literal> <curl args...>
+# -F: el texto se compara tal cual, sin expresion regular.
+# Insensible a espacios: el JSON sale compacto ("valid":false) con
+# DEBUG=false y con espacios en desarrollo; se normalizan ambos lados.
 contiene() {
     local desc="$1" texto="$2"; shift 2
-    if curl -s "$@" | grep -qF -- "$texto"; then pasa "$desc"
+    local plano
+    plano=$(printf '%s' "$texto" | tr -d '[:space:]')
+    if curl -s "$@" | tr -d '[:space:]' | grep -qF -- "$plano"; then pasa "$desc"
+    else falla "$desc (no aparece: $texto)"; fi
+}
+
+# contiene_psql <descripcion> <texto literal> <sql>
+contiene_psql() {
+    local desc="$1" texto="$2" sql="$3"
+    if psql_cmd "$sql" | grep -qF -- "$texto"; then pasa "$desc"
     else falla "$desc (no aparece: $texto)"; fi
 }
 
@@ -59,6 +71,10 @@ psql_cmd() {
 
 echo "Microservicio: $BASE"
 echo
+
+# Gunicorn tarda unos segundos en levantar los workers tras un reinicio;
+# sin esta espera, la primera peticion puede dar 000 y ensuciar el reporte.
+sleep 3
 
 echo "0. Limpieza previa del usuario de prueba"
 psql_cmd "DELETE FROM library.users WHERE lower(email) = lower('$EMAIL_PRUEBA');" \
@@ -104,8 +120,8 @@ esperado_http "correo duplicado es 409" 409 -X POST "$BASE/register?format=json"
     -H "Content-Type: application/json" \
     -d "{\"nombre\": \"Prueba\", \"apellidoPaterno\": \"Login\",
          \"email\": \"$EMAIL_PRUEBA\", \"password\": \"Secreto123\"}"
-contiene "nombre normalizado en la base" 'Prueba' \
-    < <(psql_cmd "SELECT first_name || ' ' || last_name_paternal FROM library.users WHERE lower(email) = lower('$EMAIL_PRUEBA');")
+contiene_psql "nombre normalizado en la base" 'Prueba' \
+    "SELECT first_name || ' ' || last_name_paternal FROM library.users WHERE lower(email) = lower('$EMAIL_PRUEBA');"
 
 echo
 echo "4. Verificacion"
