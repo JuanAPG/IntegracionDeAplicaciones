@@ -58,7 +58,7 @@ BEGIN
         NEW.full_name := NULLIF(concat_ws(' ',
             NULLIF(btrim(COALESCE(NEW.first_name, '')), ''),
             NULLIF(btrim(COALESCE(NEW.last_name_paternal, '')), ''),
-            NULLIF(btrim(COALESCE(NEW.last_name_maternal, '')), ''), '');
+            NULLIF(btrim(COALESCE(NEW.last_name_maternal, '')), '')), '');
     ELSIF NEW.full_name IS NOT NULL THEN
         v_parts := regexp_split_to_array(btrim(NEW.full_name), '\s+');
         NEW.first_name := v_parts[1];
