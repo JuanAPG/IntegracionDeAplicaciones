@@ -86,10 +86,10 @@ WS-Security (ObtenerEstadisticasPorModelo)
 import logging
 from xml.etree import ElementTree
 
-import clasificacion_repository as repo
-import config
-import db
-from errors import ApiError, Conflict, NotFound, Unauthorized, ValidationError
+from . import clasificacion_repository as repo
+from . import config
+from . import db
+from .errors import ApiError, Conflict, NotFound, Unauthorized, ValidationError
 
 log = logging.getLogger("library.soap.clasificacion")
 

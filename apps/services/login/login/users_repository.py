@@ -8,7 +8,7 @@ last_name_paternal y last_name_maternal; full_name se mantiene
 sincronizado por disparador para no romper el monolito (ver
 data/login_migration.sql).
 """
-import db
+from . import db
 
 PUBLIC_COLUMNS = (
     "id, first_name, last_name_paternal, last_name_maternal, full_name, "

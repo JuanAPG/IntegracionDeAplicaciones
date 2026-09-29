@@ -7,11 +7,11 @@ import os
 
 from dotenv import load_dotenv
 
-# .env vive en library_soap_service/ (un nivel arriba de soap/, donde estan
-# tambien requirements.txt y el .venv); override=False respeta las variables
-# que ya vengan del entorno real (systemd, contenedor, CI).
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
-            override=False)
+# .env vive en la raiz del proyecto (library/), compartido por todos los
+# microservicios. Se camina hacia arriba desde este archivo para encontrarlo.
+_PROJECT_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+load_dotenv(os.path.join(_PROJECT_ROOT, ".env"), override=False)
 
 
 def _int(name, default):
@@ -40,6 +40,13 @@ DEBUG = _bool("DEBUG", False)
 # despliegue necesita agruparlos, basta con poner API_PREFIX=/api en el
 # .env; app.py y openapi.py derivan todas sus rutas de este valor.
 API_PREFIX = os.getenv("API_PREFIX", "").rstrip("/")
+
+# ---------------------------------------------------------------------
+# JWT (verificacion — el emisor es el microservicio login)
+# El mismo JWT_SECRET del .env raiz debe usarse en todos los servicios.
+# ---------------------------------------------------------------------
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 # ---------------------------------------------------------------------
 # PostgreSQL

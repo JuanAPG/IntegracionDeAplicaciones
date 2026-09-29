@@ -6,10 +6,15 @@ xml.etree.ElementTree y urllib.request de la libreria estandar: la GUI
 no agrega ninguna dependencia nueva y no conoce PostgreSQL en absoluto,
 solo habla HTTP/XML con la URL del servicio SOAP que el usuario
 configure (ver library-classiffier.wsdl para el contrato).
+
+Incluye logging HTTP en consola (ver http_logger.py) y soporte para
+encabezados de autenticacion JWT (ver auth_client.py).
 """
 import urllib.error
 import urllib.request
 from xml.etree import ElementTree
+
+from http_logger import log_request, log_response
 
 SOAP_NS = "http://schemas.xmlsoap.org/soap/envelope/"
 TNS = "urn:library:clasificacion:1.0"
@@ -17,7 +22,7 @@ TNS = "urn:library:clasificacion:1.0"
 # Solo se usa en ObtenerEstadisticasPorModelo (ver soap_endpoint.py).
 WSSE_NS = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
 WSSE_PASSWORD_TEXT = ("http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-"
-                     "username-token-profile-1.0#PasswordText")
+                      "username-token-profile-1.0#PasswordText")
 
 ElementTree.register_namespace("soap", SOAP_NS)
 ElementTree.register_namespace("clv", TNS)
@@ -100,33 +105,58 @@ def _element_to_dict(element):
     return result
 
 
-def call(url, operation, fields, header=None, wsse_credentials=None, timeout=10):
+def call(url, operation, fields, header=None, wsse_credentials=None, auth_header=None, timeout=10):
     """
     Ejecuta una operacion SOAP contra `url`. Devuelve un dict con la
     respuesta ya deserializada, o lanza SoapFaultError (el servidor
     entendio la peticion pero la rechazo -- incluye credenciales
     WS-Security ausentes o invalidas) o SoapTransportError (no se
     obtuvo una respuesta SOAP interpretable).
+
+    Args:
+        url: URL del servicio SOAP
+        operation: Nombre de la operacion SOAP
+        fields: Diccionario con los campos del cuerpo SOAP
+        header: Encabezados HTTP adicionales (opcional)
+        wsse_credentials: Tupla (username, password) para WS-Security (opcional)
+        auth_header: Diccionario con encabezados de autenticacion, ej. {"Authorization": "Bearer <token>"} (opcional)
+        timeout: Timeout en segundos
     """
     body = _build_envelope(operation, fields, header, wsse_credentials)
+
+    # Construir encabezados HTTP
+    http_headers = {"Content-Type": "text/xml; charset=utf-8",
+                    "SOAPAction": f'"{TNS}#{operation}"'}
+    if auth_header:
+        http_headers.update(auth_header)
+
+    # Log de la peticion saliente
+    log_request("POST", url, http_headers, body)
+
     request = urllib.request.Request(
         url, data=body, method="POST",
-        headers={"Content-Type": "text/xml; charset=utf-8",
-                "SOAPAction": f'"{TNS}#{operation}"'})
+        headers=http_headers)
 
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             raw = response.read()
+            resp_headers = dict(response.headers.items())
+            resp_status = response.status
     except urllib.error.HTTPError as exc:
         # El servicio SIEMPRE devuelve un sobre SOAP valido en el cuerpo,
         # incluso en 400/404/409/500 (ver soap_endpoint.py): se lee igual
         # que una respuesta 200 y se distingue mirando <soap:Fault>.
         raw = exc.read()
+        resp_headers = dict(exc.headers.items()) if exc.headers else {}
+        resp_status = exc.code
     except urllib.error.URLError as exc:
         raise SoapTransportError(
             f"No se pudo conectar con el servicio SOAP en {url}: {exc.reason}") from exc
     except TimeoutError as exc:
         raise SoapTransportError(f"El servicio SOAP no respondio a tiempo ({url}).") from exc
+
+    # Log de la respuesta entrante
+    log_response(resp_status, resp_headers, raw)
 
     try:
         root = ElementTree.fromstring(raw)
@@ -157,25 +187,27 @@ def call(url, operation, fields, header=None, wsse_credentials=None, timeout=10)
 # ---------------------------------------------------------------------
 # Envolturas por operacion (lo unico que la GUI deberia llamar)
 # ---------------------------------------------------------------------
-def obtener_conceptos_pendientes(url, email, limite=10, header=None):
+def obtener_conceptos_pendientes(url, email, limite=10, header=None, auth_header=None):
     data = call(url, "ObtenerConceptosPendientes",
-               {"clasificador_email": email, "limite": limite}, header=header)
+               {"clasificador_email": email, "limite": limite}, header=header,
+               auth_header=auth_header)
     conceptos = data.get("concepto", [])
     if isinstance(conceptos, dict):
         conceptos = [conceptos]
     return conceptos
 
 
-def registrar_clasificacion(url, email, isbn, concepto, modelo, header=None):
+def registrar_clasificacion(url, email, isbn, concepto, modelo, header=None, auth_header=None):
     data = call(url, "RegistrarClasificacion",
                {"clasificador_email": email, "referencia_libro": isbn,
                 "referencia_concepto": concepto, "modelo_servicio": modelo},
-               header=header)
+               header=header, auth_header=auth_header)
     return data.get("mensaje", "Clasificacion guardada exitosamente.")
 
 
-def obtener_progreso_usuario(url, email, header=None):
-    data = call(url, "ObtenerProgresoUsuario", {"clasificador_email": email}, header=header)
+def obtener_progreso_usuario(url, email, header=None, auth_header=None):
+    data = call(url, "ObtenerProgresoUsuario", {"clasificador_email": email},
+               header=header, auth_header=auth_header)
     return int(data.get("total_clasificados", 0)), int(data.get("total_pendientes", 0))
 
 

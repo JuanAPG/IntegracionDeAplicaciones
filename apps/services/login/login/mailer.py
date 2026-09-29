@@ -12,8 +12,8 @@ import logging
 import smtplib
 from email.message import EmailMessage
 
-import config
-from errors import MailerError
+from . import config
+from .errors import MailerError
 
 log = logging.getLogger("library.login")
 

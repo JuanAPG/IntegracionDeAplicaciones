@@ -8,11 +8,16 @@ from datetime import timedelta
 
 from dotenv import load_dotenv
 
-# .env vive en apps/services/login/ (un nivel arriba de login/, donde estan
-# tambien requirements.txt y el .venv); override=False respeta las variables
-# que ya vengan del entorno real (systemd, contenedor, CI).
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
-            override=False)
+# .env vive en la raiz del proyecto (library/), compartido por todos los
+# microservicios. Se camina hacia arriba desde este archivo para encontrarlo.
+# override=False respeta las variables que ya vengan del entorno real
+# (systemd, contenedor, CI).
+_PROJECT_ROOT = os.path.dirname(
+    os.path.dirname(
+        os.path.dirname(
+            os.path.dirname(
+                os.path.dirname(os.path.abspath(__file__))))))
+load_dotenv(os.path.join(_PROJECT_ROOT, ".env"), override=False)
 
 
 def _int(name, default):
@@ -39,6 +44,16 @@ DEBUG = _bool("DEBUG", False)
 # Firma las cookies de sesion. Sin valor real, Flask no debe operar en
 # produccion: app.py lo advierte y /health lo reporta como degradado.
 SECRET_KEY = os.getenv("SECRET_KEY", "")
+
+# ---------------------------------------------------------------------
+# JWT (JSON Web Tokens) — emisor
+# El mismo secreto JWT_SECRET debe configurarse en todos los microservicios
+# que necesiten verificar tokens. Generar con:
+#   python3 -c "import secrets; print(secrets.token_urlsafe(64))"
+# ---------------------------------------------------------------------
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+JWT_EXPIRATION_HOURS = _int("JWT_EXPIRATION_HOURS", 1)
 
 # ---------------------------------------------------------------------
 # PostgreSQL (misma base library_db del proyecto)

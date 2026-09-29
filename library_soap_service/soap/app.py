@@ -21,15 +21,16 @@ from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
-import books_repository as repo
-import config
-import db
-import openapi
-import serializers
-import clasificacion_repository as clasif_repo
-import soap_endpoint
-from errors import ApiError, ValidationError
-from payloads import read_book_payload
+from . import books_repository as repo
+from . import config
+from . import db
+from . import openapi
+from . import serializers
+from . import clasificacion_repository as clasif_repo
+from . import soap_endpoint
+from .auth import token_required
+from .errors import ApiError, ValidationError
+from .payloads import read_book_payload
 
 logging.basicConfig(
     level=logging.DEBUG if config.DEBUG else logging.INFO,
@@ -52,7 +53,7 @@ CORS(
     app,
     resources={r"/*": {"origins": config.CORS_ORIGINS}},
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Accept", "Origin", "X-Requested-With"],
+    allow_headers=["Content-Type", "Accept", "Origin", "X-Requested-With", "Authorization"],
     expose_headers=["Content-Type", "Content-Length", "X-Total-Count", "Location"],
     supports_credentials=False,
     max_age=config.CORS_MAX_AGE,
@@ -280,8 +281,9 @@ def get_book_by_isbn(isbn):
 
 
 @app.post(f"{API}/books")
+@token_required
 def create_book():
-    """Alta de un libro. Acepta el cuerpo en JSON o en XML."""
+    """Alta de un libro. Acepta el cuerpo en JSON o en XML. Requiere token JWT."""
     data = read_book_payload(request, partial=False)
     row = repo.create_book(data)
     return _single_book_response(row, status=201,
@@ -289,22 +291,25 @@ def create_book():
 
 
 @app.put(f"{API}/books/<int:book_id>")
+@token_required
 def replace_book(book_id):
-    """Modificar un libro: el cuerpo describe el libro completo."""
+    """Modificar un libro: el cuerpo describe el libro completo. Requiere token JWT."""
     data = read_book_payload(request, partial=False)
     return _single_book_response(repo.update_book(book_id, data, replace=True))
 
 
 @app.patch(f"{API}/books/<int:book_id>")
+@token_required
 def update_book(book_id):
-    """Actualizar un libro: solo cambian los campos enviados."""
+    """Actualizar un libro: solo cambian los campos enviados. Requiere token JWT."""
     data = read_book_payload(request, partial=True)
     return _single_book_response(repo.update_book(book_id, data, replace=False))
 
 
 @app.delete(f"{API}/books/<int:book_id>")
+@token_required
 def delete_book(book_id):
-    """Borrar un libro (las tablas hijas caen por ON DELETE CASCADE)."""
+    """Borrar un libro (las tablas hijas caen por ON DELETE CASCADE). Requiere token JWT."""
     deleted = repo.delete_book(book_id)
     payload = {"deleted": True, "id": deleted["id"], "isbn": deleted["isbn"],
                "title": deleted["title"]}

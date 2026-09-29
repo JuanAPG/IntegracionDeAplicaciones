@@ -8,7 +8,7 @@ token (ver mailer.py y data/login_migration.sql).
 """
 import re
 
-import config
+from . import config
 
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 # Letras (incluidos acentos), espacios, guiones, apotrofos y puntos.

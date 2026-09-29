@@ -10,7 +10,7 @@ verificacion del correo.
 from datetime import datetime, timezone
 from xml.etree import ElementTree
 
-import config
+from . import config
 
 NS = config.XML_NAMESPACE
 

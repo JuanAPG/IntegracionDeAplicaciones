@@ -42,3 +42,8 @@ class UnsupportedMedia(ApiError):
 class Unauthorized(ApiError):
     status = 401
     code = "unauthorized"
+
+
+class Forbidden(ApiError):
+    status = 403
+    code = "forbidden"
