@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 # .env vive en la raiz del proyecto (library/), compartido por todos los
 # microservicios. Se camina hacia arriba desde este archivo para encontrarlo.
 _PROJECT_ROOT = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 load_dotenv(os.path.join(_PROJECT_ROOT, ".env"), override=False)
 
 
