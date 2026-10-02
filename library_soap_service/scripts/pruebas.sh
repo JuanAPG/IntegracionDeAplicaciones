@@ -9,6 +9,10 @@
 #   BASE=http://192.168.1.50:5001 ./scripts/pruebas.sh
 #
 # Deja la base como la encontro: el libro que da de alta lo borra al final.
+#
+# Convencion: toda asercion sobre cuerpo JSON lleva ?output=json explicito
+# (el servicio responde XML por omision con DEFAULT_FORMAT=xml). Solo la
+# seccion 3 prueba el XML y la negociacion; el resto no depende del default.
 # =====================================================================
 set -uo pipefail
 
@@ -55,12 +59,12 @@ esperado_http "indice"                 200 "$BASE/"
 esperado_http "estado de la base"      200 "$BASE/health"
 esperado_http "especificacion OpenAPI" 200 "$BASE/openapi.json"
 esperado_http "Swagger UI"             200 -L "$BASE/docs"
-contiene "el indice anuncia /docs" '"swaggerUi"' "$BASE/"
+contiene "el indice anuncia /docs" '"swaggerUi"' "$BASE/?output=json"
 
 echo
 echo "2. Lectura"
 esperado_http "todos los libros"        200 "$API/books"
-contiene "la coleccion trae libros"     '"books"'   "$API/books?limit=2"
+contiene "la coleccion trae libros"     '"books"'   "$API/books?limit=2&output=json"
 contiene "la cabecera X-Total-Count"    'X-Total-Count' -D - -o /dev/null "$API/books?limit=1"
 esperado_http "un libro por id"         200 "$API/books/1"
 esperado_http "un libro por ISBN"       200 "$API/books/isbn/978-0133970777"
@@ -70,22 +74,22 @@ echo
 echo "3. Los dos formatos de intercambio"
 contiene "XML por ?output=xml"          '<library xmlns="urn:library:catalog:1.0"' "$API/books?limit=1&output=xml"
 contiene "XML por Accept"               '<book '        -H 'Accept: application/xml' "$API/books/1"
-contiene "JSON por omision"             '"book"'        "$API/books/1"
+contiene "JSON con ?output=json"          '"book"'        "$API/books/1?output=json"
 contiene "el XML respeta el diseno"     '<publicationYear>' "$API/books/1?output=xml"
 contiene "precio con moneda"            '<price currency=' "$API/books/1?output=xml"
 
 echo
 echo "4. Busqueda por atributos"
-contiene "por titulo"      '"title"' "$API/books/search?title=algoritmos"
-contiene "por autor"       'Asimov'  "$API/books/search?author=asimov"
-contiene "por genero"      '"books"' "$API/books/search?genre=novela"
-contiene "por concepto"    '"books"' "$API/books/search?concept=SOLID"
-contiene "por categoria"   '"books"' "$API/books/search?category=Academico"
-contiene "por formato"     '"books"' "$API/books/search?format=Digital"
-contiene "por rango de precio" '"books"' "$API/books/search?price_min=300&price_max=1000"
-contiene "por rango de anos"   '"books"' "$API/books/search?year_min=2000&year_max=2020"
-contiene "solo con existencias" '"books"' "$API/books/search?in_stock=true"
-contiene "texto libre"     '"books"' "$API/books/search?q=clean"
+contiene "por titulo"      '"title"' "$API/books/search?title=algoritmos&output=json"
+contiene "por autor"       'Asimov'  "$API/books/search?author=asimov&output=json"
+contiene "por genero"      '"books"' "$API/books/search?genre=novela&output=json"
+contiene "por concepto"    '"books"' "$API/books/search?concept=SOLID&output=json"
+contiene "por categoria"   '"books"' "$API/books/search?category=Academico&output=json"
+contiene "por formato"     '"books"' "$API/books/search?format=Digital&output=json"
+contiene "por rango de precio" '"books"' "$API/books/search?price_min=300&price_max=1000&output=json"
+contiene "por rango de anos"   '"books"' "$API/books/search?year_min=2000&year_max=2020&output=json"
+contiene "solo con existencias" '"books"' "$API/books/search?in_stock=true&output=json"
+contiene "texto libre"     '"books"' "$API/books/search?q=clean&output=json"
 esperado_http "orden invalido"  400 "$API/books?sort=inexistente"
 
 echo
@@ -111,10 +115,10 @@ if [ -z "${JWT:-}" ]; then
     echo "  (sin JWT: se omite el ciclo de alta/modificacion/baja; pase JWT=<token> para probarlo)"
 else
 # Limpieza previa por si una corrida anterior se interrumpio.
-id_previo=$(curl -s "$API/books/isbn/$ISBN_PRUEBA" | sed -n 's/.*"id": *\([0-9]*\).*/\1/p' | head -1)
+id_previo=$(curl -s "$API/books/isbn/$ISBN_PRUEBA?output=json" | sed -n 's/.*"id": *\([0-9]*\).*/\1/p' | head -1)
 [ -n "$id_previo" ] && curl -s -o /dev/null -X DELETE "$API/books/$id_previo" ${AUTH[@]+"${AUTH[@]}"}
 
-respuesta=$(curl -s -X POST "$API/books" -H 'Content-Type: application/json' ${AUTH[@]+"${AUTH[@]}"} -d "{
+respuesta=$(curl -s -X POST "$API/books?output=json" -H 'Content-Type: application/json' ${AUTH[@]+"${AUTH[@]}"} -d "{
   \"isbn\": \"$ISBN_PRUEBA\",
   \"title\": \"Libro de prueba automatizada\",
   \"publicationYear\": 2026,
@@ -134,20 +138,20 @@ else falla "alta de un libro: $respuesta"; fi
 
 if [ -n "$NUEVO_ID" ]; then
     contiene "actualizar (PATCH cambia el precio)" '"price": 175' \
-        -X PATCH "$API/books/$NUEVO_ID" -H 'Content-Type: application/json' ${AUTH[@]+"${AUTH[@]}"} -d '{"price": 175.00}'
+        -X PATCH "$API/books/$NUEVO_ID?output=json" -H 'Content-Type: application/json' ${AUTH[@]+"${AUTH[@]}"} -d '{"price": 175.00}'
     contiene "modificar (PUT reemplaza el titulo)" 'Libro de prueba reemplazado' \
-        -X PUT "$API/books/$NUEVO_ID" -H 'Content-Type: application/json' ${AUTH[@]+"${AUTH[@]}"} \
+        -X PUT "$API/books/$NUEVO_ID?output=json" -H 'Content-Type: application/json' ${AUTH[@]+"${AUTH[@]}"} \
         -d "{\"isbn\":\"$ISBN_PRUEBA\",\"title\":\"Libro de prueba reemplazado\",\"publicationYear\":2026,\"price\":200.00,\"stock\":1,\"format\":\"Fisico\",\"category\":\"Tecnico\",\"authors\":[\"Autor De Prueba\"]}"
-    contiene "PUT vacia las colecciones ausentes" '"concepts": []' "$API/books/$NUEVO_ID"
-    esperado_http "ISBN duplicado" 409 -X POST "$API/books" -H 'Content-Type: application/json' ${AUTH[@]+"${AUTH[@]}"} \
+    contiene "PUT vacia las colecciones ausentes" '"concepts": []' "$API/books/$NUEVO_ID?output=json"
+    esperado_http "ISBN duplicado" 409 -X POST "$API/books?output=json" -H 'Content-Type: application/json' ${AUTH[@]+"${AUTH[@]}"} \
         -d "{\"isbn\":\"$ISBN_PRUEBA\",\"title\":\"Copia\",\"publicationYear\":2026,\"price\":1,\"format\":\"Digital\",\"category\":\"Tecnico\"}"
     esperado_http "baja del libro" 200 -X DELETE "$API/books/$NUEVO_ID" ${AUTH[@]+"${AUTH[@]}"}
     esperado_http "el libro ya no existe" 404 "$API/books/$NUEVO_ID"
 fi
 
 echo
-echo "7. Alta con el cuerpo en XML"
-xml_id=$(curl -s -X POST "$API/books" -H 'Content-Type: application/xml' ${AUTH[@]+"${AUTH[@]}"} --data-binary "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+echo "7. Alta con el cuerpo en XML (respuesta pedida en JSON)"
+xml_id=$(curl -s -X POST "$API/books?output=json" -H 'Content-Type: application/xml' ${AUTH[@]+"${AUTH[@]}"} --data-binary "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <book xmlns=\"urn:library:catalog:1.0\" isbn=\"$ISBN_PRUEBA\">
   <title>Libro de prueba en XML</title>
   <publicationYear>2026</publicationYear>
