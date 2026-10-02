@@ -1,3 +1,4 @@
+import os
 import re
 import socket
 import getpass
@@ -29,8 +30,10 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 TIPO_CLIENTE = "Python-Tkinter-Clasificador"
 IDENTIFICADOR_CLIENTE = f"{getpass.getuser()}@{socket.gethostname()}"
 
-# URL del microservicio login (genera el token JWT)
-LOGIN_SERVICE_URL = "http://localhost:5000"
+# URL del microservicio login (genera el token JWT).
+# Configurable por variable de entorno para apuntar a un servidor remoto:
+#   LOGIN_SERVICE_URL=http://34.51.14.158:5000 python Ejercicio1.py
+LOGIN_SERVICE_URL = os.getenv("LOGIN_SERVICE_URL", "http://localhost:5000")
 
 
 def clasificar_texto(texto):
