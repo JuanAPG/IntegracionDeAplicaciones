@@ -1,3 +1,4 @@
+import os
 import re
 import socket
 import getpass
@@ -5,6 +6,8 @@ import tkinter as tk
 from tkinter import messagebox, scrolledtext, ttk
 
 import soap_client
+from auth_client import AuthClient
+from http_logger import log_request, log_response
 
 MODELOS_SERVICIO = ("IaaS", "PaaS", "SaaS", "FaaS", "N/A")
 
@@ -27,6 +30,11 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 TIPO_CLIENTE = "Python-Tkinter-Clasificador"
 IDENTIFICADOR_CLIENTE = f"{getpass.getuser()}@{socket.gethostname()}"
 
+# URL del microservicio login (genera el token JWT).
+# Configurable por variable de entorno para apuntar a un servidor remoto:
+#   LOGIN_SERVICE_URL=http://34.51.14.158:5000 python Ejercicio1.py
+LOGIN_SERVICE_URL = os.getenv("LOGIN_SERVICE_URL", "http://localhost:5000")
+
 
 def clasificar_texto(texto):
     """Heuristica local por palabras clave. Devuelve (codigo_modelo, etiqueta_larga)."""
@@ -41,8 +49,11 @@ class Ejercicio1(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Clasificador de Servicios Cloud Computing")
-        self.geometry("700x600")
+        self.geometry("700x650")
         self.resizable(False, False)
+
+        # Cliente de autenticacion JWT
+        self.auth = AuthClient(LOGIN_SERVICE_URL)
 
         notebook = ttk.Notebook(self)
         notebook.pack(fill="both", expand=True)
@@ -52,8 +63,50 @@ class Ejercicio1(tk.Tk):
         notebook.add(tab_local, text="Clasificacion local")
         notebook.add(tab_soap, text="Clasificacion SOAP")
 
+        self._crear_barra_login()
         self._crear_tab_local(tab_local)
         self._crear_tab_soap(tab_soap)
+
+    # ===================================================================
+    # Barra de autenticacion JWT
+    # ===================================================================
+    def _crear_barra_login(self):
+        frame = tk.LabelFrame(self, text="Autenticacion JWT", padx=8, pady=4)
+        frame.pack(fill="x", padx=10, pady=(8, 0))
+
+        tk.Label(frame, text="Email:").grid(row=0, column=0, sticky="w", padx=3)
+        self.txt_login_email = tk.Entry(frame, width=25)
+        self.txt_login_email.grid(row=0, column=1, padx=3)
+
+        tk.Label(frame, text="Password:").grid(row=0, column=2, sticky="w", padx=3)
+        self.txt_login_password = tk.Entry(frame, show="*", width=20)
+        self.txt_login_password.grid(row=0, column=3, padx=3)
+
+        self.btn_login = tk.Button(frame, text="Login", command=self._login,
+                                   bg="#1565c0", fg="white")
+        self.btn_login.grid(row=0, column=4, padx=3)
+
+        self.lbl_auth_status = tk.Label(frame, text="No autenticado",
+                                        fg="#c62828", font=("Arial", 9, "bold"))
+        self.lbl_auth_status.grid(row=0, column=5, padx=(10, 0))
+
+    def _login(self):
+        email = self.txt_login_email.get().strip()
+        password = self.txt_login_password.get()
+
+        if not email or not password:
+            messagebox.showwarning("Aviso", "Ingrese email y password.")
+            return
+
+        try:
+            self.auth.login(email, password)
+            self.lbl_auth_status.config(
+                text=f"Autenticado: {self.auth.email}", fg="#2e7d32")
+            messagebox.showinfo("Login exitoso",
+                                f"Bienvenido {self.auth.email}\nToken JWT almacenado en memoria.")
+        except Exception as exc:
+            self.lbl_auth_status.config(text="No autenticado", fg="#c62828")
+            messagebox.showerror("Error de autenticacion", str(exc))
 
     # ===================================================================
     # Modo local: heuristica sin red, sin base de datos (comportamiento
@@ -199,6 +252,12 @@ class Ejercicio1(tk.Tk):
     def _header_cliente(self):
         return {"tipo_cliente": TIPO_CLIENTE, "identificador": IDENTIFICADOR_CLIENTE}
 
+    def _auth_header(self):
+        """Devuelve el encabezado JWT si esta autenticado, o None."""
+        if self.auth.is_authenticated():
+            return self.auth.get_auth_header()
+        return None
+
     # ---- acciones -------------------------------------------------------
     def _cargar_pendientes(self):
         datos = self._datos_identidad()
@@ -208,7 +267,8 @@ class Ejercicio1(tk.Tk):
 
         try:
             pendientes = soap_client.obtener_conceptos_pendientes(
-                url, correo, limite=10, header=self._header_cliente())
+                url, correo, limite=10, header=self._header_cliente(),
+                auth_header=self._auth_header())
         except soap_client.SoapFaultError as fault:
             self._mostrar_fault(fault)
             return
@@ -259,7 +319,7 @@ class Ejercicio1(tk.Tk):
         try:
             mensaje = soap_client.registrar_clasificacion(
                 url, correo, concepto["referencia_libro"], concepto["referencia_concepto"],
-                modelo, header=self._header_cliente())
+                modelo, header=self._header_cliente(), auth_header=self._auth_header())
         except soap_client.SoapFaultError as fault:
             self._mostrar_fault(fault)
             return
@@ -279,7 +339,7 @@ class Ejercicio1(tk.Tk):
 
         try:
             clasificados, pendientes = soap_client.obtener_progreso_usuario(
-                url, correo, header=self._header_cliente())
+                url, correo, header=self._header_cliente(), auth_header=self._auth_header())
         except soap_client.SoapFaultError as fault:
             self._mostrar_fault(fault)
             return

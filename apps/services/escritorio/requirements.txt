@@ -1,0 +1,7 @@
+# Cliente de escritorio (Tkinter)
+#   python3 -m venv .venv
+#   source .venv/bin/activate
+#   pip install -r requirements.txt
+#
+# requests: cliente HTTP para autenticacion JWT y futuras llamadas REST
+requests>=2.31

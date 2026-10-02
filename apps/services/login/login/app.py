@@ -30,17 +30,18 @@ from flask import Flask, Response, jsonify, request, session
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
-import config
-import db
-import mailer as mail_sender
-import openapi
-import serializers
-import tokens as token_box
-import users_repository as repo
-import validators
-from errors import ApiError, Conflict, EmailNotVerified, Gone, NotFound, Unauthorized, ValidationError
-from mailer import MailerError  # noqa: F401  (se documenta el 503 en openapi.py)
-from security import hash_password, verify_password
+from . import config
+from . import db
+from . import jwt_utils
+from . import mailer as mail_sender
+from . import openapi
+from . import serializers
+from . import tokens as token_box
+from . import users_repository as repo
+from . import validators
+from .errors import ApiError, Conflict, EmailNotVerified, Gone, NotFound, Unauthorized, ValidationError
+from .mailer import MailerError  # noqa: F401  (se documenta el 503 en openapi.py)
+from .security import hash_password, verify_password
 
 logging.basicConfig(
     level=logging.DEBUG if config.DEBUG else logging.INFO,
@@ -412,7 +413,17 @@ def login():
     session["login_at"] = datetime.now(timezone.utc).isoformat()
     repo.set_last_login(row["id"])
 
-    payload = {"authenticated": True, "user": repo.public_user(repo.get_by_id(row["id"]))}
+    # Generar token JWT para el cliente
+    token = jwt_utils.generate_jwt(row["id"], row["email"], row["role"])
+    expires_in = int(config.JWT_EXPIRATION_HOURS * 3600)
+
+    payload = {
+        "authenticated": True,
+        "user": repo.public_user(repo.get_by_id(row["id"])),
+        "token": token,
+        "tokenType": "Bearer",
+        "expiresIn": expires_in,
+    }
     return respond(payload, serializers.dict_element("session", payload))
 
 

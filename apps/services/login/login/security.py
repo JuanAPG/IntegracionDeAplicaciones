@@ -9,7 +9,7 @@ este microservicio. La contrasena en claro nunca se almacena.
 """
 import bcrypt
 
-import config
+from . import config
 
 
 def hash_password(plain):

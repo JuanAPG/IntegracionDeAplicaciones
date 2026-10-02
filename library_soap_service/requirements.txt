@@ -17,3 +17,6 @@ gunicorn>=21.2
 # Documentacion: publica /openapi.json y la interfaz Swagger UI en /docs.
 # Trae los archivos de Swagger UI en el propio paquete (funciona sin Internet).
 flasgger>=0.9.7
+
+# JWT: verificacion de tokens (el emisor es el microservicio login)
+PyJWT>=2.8,<3

@@ -28,8 +28,8 @@ Errores de negocio
   API REST/XML. soap_endpoint.py las atrapa y arma el SOAP Fault con la
   categoria correcta (ver la tabla de casos en ese modulo).
 """
-import db
-from errors import Conflict, NotFound, ValidationError
+from . import db
+from .errors import Conflict, NotFound, ValidationError
 
 MODELOS_SERVICIO_VALIDOS = ("IaaS", "PaaS", "SaaS", "FaaS", "N/A")
 

@@ -12,7 +12,7 @@ app.py se la entrega a Flasgger, que publica:
     /openapi.json   el documento
     /docs           la interfaz Swagger UI
 """
-import config
+from . import config
 
 SERVER_URL = f"http://localhost:{config.PORT}"
 API = config.API_PREFIX

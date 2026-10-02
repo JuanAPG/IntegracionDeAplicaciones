@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from xml.etree import ElementTree
 
-import config
+from . import config
 
 NS = config.XML_NAMESPACE
 

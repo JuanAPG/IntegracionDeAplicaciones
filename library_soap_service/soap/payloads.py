@@ -25,7 +25,7 @@ import re
 from decimal import Decimal, InvalidOperation
 from xml.etree import ElementTree
 
-from errors import UnsupportedMedia, ValidationError
+from .errors import UnsupportedMedia, ValidationError
 
 # Campos escalares con sus alias aceptados (camelCase del XML y snake_case).
 SCALAR_ALIASES = {

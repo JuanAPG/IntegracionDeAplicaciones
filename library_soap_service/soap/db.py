@@ -13,7 +13,7 @@ import psycopg2
 import psycopg2.extras
 from psycopg2 import pool as pg_pool
 
-import config
+from . import config
 
 _pool = None
 _lock = threading.Lock()

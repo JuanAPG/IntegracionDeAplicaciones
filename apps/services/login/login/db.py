@@ -9,7 +9,7 @@ asi /health puede informar el fallo en lugar de morir al importar.
 import threading
 from contextlib import contextmanager
 
-import config
+from . import config
 
 _pool = None
 _lock = threading.Lock()

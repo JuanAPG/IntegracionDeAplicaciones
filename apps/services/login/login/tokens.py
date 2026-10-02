@@ -8,7 +8,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-import config
+from . import config
 
 
 def issue_token():

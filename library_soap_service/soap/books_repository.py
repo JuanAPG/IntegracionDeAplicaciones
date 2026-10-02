@@ -11,8 +11,8 @@ hace falta desduplicar en Python.
 import psycopg2
 from psycopg2 import errorcodes
 
-import db
-from errors import Conflict, NotFound, ValidationError
+from . import db
+from .errors import Conflict, NotFound, ValidationError
 
 # ---------------------------------------------------------------------
 # SELECT base
