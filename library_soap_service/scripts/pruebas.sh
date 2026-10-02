@@ -17,6 +17,11 @@ BASE="${BASE:-http://localhost:5001}"
 # mismo valor aqui:  API_PREFIX=/api ./scripts/pruebas.sh
 API="$BASE${API_PREFIX:-}"
 ISBN_PRUEBA="978-9999999999"
+# JWT Bearer para las escrituras (lo emite POST /login del microservicio
+# login). Sin el solo se prueban los 401/403; con el, el ciclo completo:
+#   JWT=<token> ./scripts/pruebas.sh
+AUTH=()
+[ -n "${JWT:-}" ] && AUTH=(-H "Authorization: Bearer $JWT")
 
 ok=0
 fallos=0
@@ -90,12 +95,26 @@ for catalogo in formats categories genres authors concepts; do
 done
 
 echo
+echo "5b. Autorizacion JWT (escrituras protegidas)"
+esperado_http "POST sin token es 401" 401 -X POST "$API/books" \
+    -H 'Content-Type: application/json' -d '{"title":"X"}'
+esperado_http "Bearer malformado es 401" 401 -X POST "$API/books" \
+    -H 'Content-Type: application/json' -H 'Authorization: Token abc' -d '{"title":"X"}'
+esperado_http "token falso es 403" 403 -X POST "$API/books" \
+    -H 'Content-Type: application/json' -H 'Authorization: Bearer falso123' -d '{"title":"X"}'
+contiene "el 401 tambien sale en XML" '<error xmlns=' -X POST "$API/books?output=xml" \
+    -H 'Content-Type: application/json' -d '{"title":"X"}'
+
+echo
 echo "6. Escritura"
+if [ -z "${JWT:-}" ]; then
+    echo "  (sin JWT: se omite el ciclo de alta/modificacion/baja; pase JWT=<token> para probarlo)"
+else
 # Limpieza previa por si una corrida anterior se interrumpio.
 id_previo=$(curl -s "$API/books/isbn/$ISBN_PRUEBA" | sed -n 's/.*"id": *\([0-9]*\).*/\1/p' | head -1)
-[ -n "$id_previo" ] && curl -s -o /dev/null -X DELETE "$API/books/$id_previo"
+[ -n "$id_previo" ] && curl -s -o /dev/null -X DELETE "$API/books/$id_previo" "${AUTH[@]}"
 
-respuesta=$(curl -s -X POST "$API/books" -H 'Content-Type: application/json' -d "{
+respuesta=$(curl -s -X POST "$API/books" -H 'Content-Type: application/json' "${AUTH[@]}" -d "{
   \"isbn\": \"$ISBN_PRUEBA\",
   \"title\": \"Libro de prueba automatizada\",
   \"publicationYear\": 2026,
@@ -115,20 +134,20 @@ else falla "alta de un libro: $respuesta"; fi
 
 if [ -n "$NUEVO_ID" ]; then
     contiene "actualizar (PATCH cambia el precio)" '"price": 175' \
-        -X PATCH "$API/books/$NUEVO_ID" -H 'Content-Type: application/json' -d '{"price": 175.00}'
+        -X PATCH "$API/books/$NUEVO_ID" -H 'Content-Type: application/json' "${AUTH[@]}" -d '{"price": 175.00}'
     contiene "modificar (PUT reemplaza el titulo)" 'Libro de prueba reemplazado' \
-        -X PUT "$API/books/$NUEVO_ID" -H 'Content-Type: application/json' \
+        -X PUT "$API/books/$NUEVO_ID" -H 'Content-Type: application/json' "${AUTH[@]}" \
         -d "{\"isbn\":\"$ISBN_PRUEBA\",\"title\":\"Libro de prueba reemplazado\",\"publicationYear\":2026,\"price\":200.00,\"stock\":1,\"format\":\"Fisico\",\"category\":\"Tecnico\",\"authors\":[\"Autor De Prueba\"]}"
     contiene "PUT vacia las colecciones ausentes" '"concepts": []' "$API/books/$NUEVO_ID"
-    esperado_http "ISBN duplicado" 409 -X POST "$API/books" -H 'Content-Type: application/json' \
+    esperado_http "ISBN duplicado" 409 -X POST "$API/books" -H 'Content-Type: application/json' "${AUTH[@]}" \
         -d "{\"isbn\":\"$ISBN_PRUEBA\",\"title\":\"Copia\",\"publicationYear\":2026,\"price\":1,\"format\":\"Digital\",\"category\":\"Tecnico\"}"
-    esperado_http "baja del libro" 200 -X DELETE "$API/books/$NUEVO_ID"
+    esperado_http "baja del libro" 200 -X DELETE "$API/books/$NUEVO_ID" "${AUTH[@]}"
     esperado_http "el libro ya no existe" 404 "$API/books/$NUEVO_ID"
 fi
 
 echo
 echo "7. Alta con el cuerpo en XML"
-xml_id=$(curl -s -X POST "$API/books" -H 'Content-Type: application/xml' --data-binary "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+xml_id=$(curl -s -X POST "$API/books" -H 'Content-Type: application/xml' "${AUTH[@]}" --data-binary "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <book xmlns=\"urn:library:catalog:1.0\" isbn=\"$ISBN_PRUEBA\">
   <title>Libro de prueba en XML</title>
   <publicationYear>2026</publicationYear>
@@ -140,20 +159,25 @@ xml_id=$(curl -s -X POST "$API/books" -H 'Content-Type: application/xml' --data-
 </book>" | sed -n 's/.*"id": *\([0-9]*\).*/\1/p' | head -1)
 if [ -n "$xml_id" ]; then
     pasa "alta con cuerpo XML (id $xml_id)"
-    esperado_http "baja del libro creado en XML" 200 -X DELETE "$API/books/$xml_id"
+    esperado_http "baja del libro creado en XML" 200 -X DELETE "$API/books/$xml_id" "${AUTH[@]}"
 else
     falla "alta con cuerpo XML"
 fi
+fi # fin del ciclo de escritura (requiere JWT)
 
 echo
 echo "8. Errores"
-esperado_http "faltan campos obligatorios" 400 -X POST "$API/books" \
+if [ -n "${JWT:-}" ]; then
+esperado_http "faltan campos obligatorios" 400 -X POST "$API/books" "${AUTH[@]}" \
     -H 'Content-Type: application/json' -d '{"title":"Sin ISBN"}'
-esperado_http "formato fuera del catalogo" 400 -X POST "$API/books" \
+esperado_http "formato fuera del catalogo" 400 -X POST "$API/books" "${AUTH[@]}" \
     -H 'Content-Type: application/json' \
     -d '{"isbn":"978-1111111111","title":"X","publicationYear":2020,"price":1,"format":"Papiro","category":"Tecnico"}'
-esperado_http "Content-Type no soportado"  415 -X POST "$API/books" \
+esperado_http "Content-Type no soportado"  415 -X POST "$API/books" "${AUTH[@]}" \
     -H 'Content-Type: text/plain' -d 'hola'
+else
+    echo "  (sin JWT: validaciones de escritura omitidas; pase JWT=<token>)"
+fi
 contiene "el error tambien sale en XML" '<error xmlns=' "$API/books/999999?output=xml"
 
 echo

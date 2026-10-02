@@ -322,7 +322,8 @@ class LibraryApp(tk.Tk):
 
     def _session_expired(self):
         self.user = None
-        self.config = self.save_config(None, None, {})
+        self.books_client.set_token(None)
+        self.config = self.save_config(None, None, {}, None)
         self._refresh_auth_ui()
         messagebox.showwarning(
             "Sesión expirada",
@@ -367,7 +368,10 @@ class LibraryApp(tk.Tk):
 
     def _on_authenticated(self, email, user):
         self.user = user or {"email": email}
-        self.config = self.save_config(email, self.user, self.login_client.snapshot_cookies())
+        token = self.login_client.token
+        self.books_client.set_token(token)
+        self.config = self.save_config(email, self.user,
+                                       self.login_client.snapshot_cookies(), token)
         self._refresh_auth_ui()
         self.status.configure(text=f"Sesión iniciada como {email}.")
 
@@ -377,7 +381,8 @@ class LibraryApp(tk.Tk):
         except Exception:
             pass
         self.user = None
-        self.config = self.save_config(None, None, {})
+        self.books_client.set_token(None)
+        self.config = self.save_config(None, None, {}, None)
         self.after(0, self._refresh_auth_ui)
         self.after(0, lambda: self.status.configure(text="Sesión cerrada en este equipo."))
 
@@ -395,7 +400,8 @@ class LibraryApp(tk.Tk):
                     self.status.configure(text="Sesión restaurada y vigente.")
                 else:
                     self.user = None
-                    self.config = self.save_config(None, None, {})
+                    self.books_client.set_token(None)
+                    self.config = self.save_config(None, None, {}, None)
                     self._refresh_auth_ui()
                     self.status.configure(text="La sesión guardada expiró.")
                     messagebox.showwarning(
@@ -413,6 +419,11 @@ class LibraryApp(tk.Tk):
                                 "Regístrate o inicia sesión para crear, editar o eliminar libros.\n\nVer y buscar sigue libre.",
                                 parent=self)
             AuthDialog(self, self.login_client, self._on_authenticated)
+            return
+        if self.login_client.token_expired():
+            # El JWT (1 h) vence antes que la cookie (8 h): sin token no hay
+            # escritura posible (401/403), asi que se pide login de una vez.
+            self._session_expired()
             return
         self.status.configure(text="Validando sesión con el servidor…")
         def work():

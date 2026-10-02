@@ -4,7 +4,7 @@ Pruebas del microservicio SIN PostgreSQL ni sendmail: se simulan el
 repositorio y el envio de correo, y se ejercitan todos los endpoints en
 XML (omision) y JSON (?format=json) con el test_client de Flask.
 
-Uso (en la VM o aqui con un .venv):
+Uso (en la VM o aqui con un .venv, desde apps/services/login):
     python test/test_login_mocked.py
 """
 import os
@@ -12,14 +12,15 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 os.environ.setdefault("SECRET_KEY", "secreto-de-pruebas")
+os.environ.setdefault("JWT_SECRET", "secreto-jwt-de-pruebas")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(os.path.dirname(HERE), "login"))
+sys.path.insert(0, os.path.dirname(HERE))
 
-import app as appmod  # noqa: E402
-import db as dbmod  # noqa: E402
-import tokens as token_box  # noqa: E402
-import users_repository as repo  # noqa: E402
+import login.app as appmod  # noqa: E402
+import login.db as dbmod  # noqa: E402
+import login.tokens as token_box  # noqa: E402
+import login.users_repository as repo  # noqa: E402
 
 SENT = []
 USERS = {}
@@ -221,6 +222,18 @@ r = client.post("/login?format=json",
                 json={"email": "ada@ejemplo.mx", "password": "Secreto123"})
 check("login 200", r.status_code == 200 and r.get_json()["authenticated"] is True,
       body_text(r)[:200])
+data = r.get_json()
+check("login devuelve JWT Bearer",
+      data.get("tokenType") == "Bearer" and isinstance(data.get("token"), str)
+      and len(data["token"].split(".")) == 3 and data.get("expiresIn") == 3600,
+      str(sorted(data.keys())))
+import jwt as _jwt
+try:
+    claims = _jwt.decode(data["token"], options={"verify_signature": False})
+    check("JWT con claims sub/email/role/exp",
+          all(k in claims for k in ("sub", "email", "role", "exp", "iat")))
+except Exception as exc:
+    check("JWT con claims sub/email/role/exp", False, str(exc)[:120])
 r = client.get("/session?format=json")
 check("sesion autenticada", r.get_json().get("authenticated") is True
       and r.get_json()["user"]["email"] == "ada@ejemplo.mx", body_text(r)[:200])

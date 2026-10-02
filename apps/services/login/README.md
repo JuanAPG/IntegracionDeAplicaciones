@@ -164,11 +164,16 @@ sudo -u library /opt/library/login/.venv/bin/pip install -r /opt/library/login/r
 
 ```bash
 sudo -u library cp /opt/library/login/.env.example /opt/library/login/.env
-sudo -u library vi /opt/library/login/.env   # PGPASSWORD, SECRET_KEY, SMTP_FROM, CORS_ORIGINS
+sudo -u library vi /opt/library/login/.env   # PGPASSWORD, SECRET_KEY, JWT_SECRET, SMTP_FROM, CORS_ORIGINS
 sudo chmod 600 /opt/library/login/.env
 ```
 
-Genere el secreto con `python3 -c "import secrets; print(secrets.token_hex(48))"`.
+Genere los secretos (el `JWT_SECRET` debe ser **el mismo** en todos los
+micros; tambien puede vivir en el `.env` de la raiz del repo):
+`SECRET_KEY` con `python3 -c "import secrets; print(secrets.token_hex(48))"` y
+`JWT_SECRET` con `python3 -c "import secrets; print(secrets.token_urlsafe(64))"`.
+Sin `JWT_SECRET` el `/health` reporta `jwt: missing_secret` y los Bearer no
+son seguros.
 
 ### 5.4 Sendmail local
 
@@ -194,10 +199,10 @@ Wants=network-online.target
 Type=simple
 User=library
 Group=library
-WorkingDirectory=/opt/library/login/login
+WorkingDirectory=/opt/library/login
 ExecStart=/opt/library/login/.venv/bin/gunicorn \
           --workers 3 --bind 127.0.0.1:5000 \
-          --access-logfile - --error-logfile - wsgi:application
+          --access-logfile - --error-logfile - login.wsgi:application
 Restart=on-failure
 RestartSec=5
 

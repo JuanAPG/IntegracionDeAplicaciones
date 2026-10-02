@@ -241,12 +241,15 @@ def health():
     warnings = []
     if not config.SECRET_KEY:
         warnings.append("SECRET_KEY sin fijar: las sesiones no son seguras.")
+    if not config.jwt_configured():
+        warnings.append("JWT_SECRET sin fijar: los tokens Bearer no son seguros.")
     try:
         info = db.ping()
         payload = {"status": "ok", "database": info["db"], "user": info["usr"],
                    "schema": config.PGSCHEMA,
                    "server": info["version"].split(" on ")[0],
                    "sessionSigning": "ok" if config.SECRET_KEY else "missing_secret",
+                   "jwt": "ok" if config.jwt_configured() else "missing_secret",
                    "mailer": f"{config.SMTP_HOST}:{config.SMTP_PORT}"}
         status = 200
     except Exception as exc:                       # noqa: BLE001 - se reporta al cliente

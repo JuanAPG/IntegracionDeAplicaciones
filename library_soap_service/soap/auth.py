@@ -19,13 +19,45 @@ Uso:
 import functools
 
 import jwt
-from flask import jsonify, request
+from flask import Response, jsonify, request
 
 from . import config
 
 
+def _wants_xml():
+    """Negociacion minima (?output=/Accept) para que el 401/403 salga en el
+    formato pedido, igual que el resto del servicio (ver app.wants_xml)."""
+    for name in ("output", "_format", "format"):
+        value = (request.args.get(name) or "").strip().lower()
+        if value in ("xml", "application/xml", "text/xml"):
+            return True
+        if value in ("json", "application/json"):
+            return False
+    accept = request.headers.get("Accept", "")
+    if accept and "*/*" not in accept:
+        xml_pos = min((accept.find(t) for t in ("application/xml", "text/xml")
+                       if t in accept), default=-1)
+        json_pos = accept.find("application/json")
+        if xml_pos >= 0 and (json_pos < 0 or xml_pos < json_pos):
+            return True
+    return config.DEFAULT_FORMAT == "xml"
+
+
 def _error_response(status, code, message):
-    """Respuesta de error JSON consistente."""
+    """Respuesta de error en el formato pedido (XML o JSON)."""
+    if _wants_xml():
+        # Misma forma que serializers.error_element (para no acoplar este
+        # modulo copiable a serializers): <error status code><message/>.
+        ns = config.XML_NAMESPACE
+        safe = (message.replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;"))
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            f'<error xmlns="{ns}" status="{status}" code="{code}">'
+            f"<message>{safe}</message>"
+            "</error>"
+        )
+        return Response(xml, status=status, mimetype="application/xml")
     response = jsonify({"error": {"status": status, "code": code, "message": message}})
     response.status_code = status
     return response

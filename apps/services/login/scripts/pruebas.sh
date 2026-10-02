@@ -143,6 +143,10 @@ esperado_http "credencial mala es 401" 401 -c "$JAR" -X POST "$BASE/login?format
 contiene "login correcto" '"authenticated": true' -c "$JAR" -X POST "$BASE/login?format=json" \
     -H "Content-Type: application/json" \
     -d "{\"email\": \"$EMAIL_PRUEBA\", \"password\": \"Secreto123\"}"
+contiene "login emite JWT Bearer" '"tokenType": "Bearer"' -X POST "$BASE/login?format=json" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\": \"$EMAIL_PRUEBA\", \"password\": \"Secreto123\"}"
+contiene "health reporta estado JWT" '"jwt"' "$BASE/health?format=json"
 contiene "sesion autenticada" '"authenticated": true' -b "$JAR" "$BASE/session?format=json"
 contiene "sesion en XML por omision" '<session' -b "$JAR" "$BASE/session"
 contiene "logout" '"authenticated": false' -b "$JAR" -c "$JAR" -X POST "$BASE/logout?format=json"

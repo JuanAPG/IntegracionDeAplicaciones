@@ -2,7 +2,7 @@
 
 Corre **local** en tu computadora y consume los microservicios de la **VM**:
 
-- login `http://34.51.125.230:5000` · books `http://34.51.125.230:5001`
+- login `http://34.51.14.158:5000` · books `http://34.51.14.158:5001`
 - locales: `http://localhost:5000` · `http://localhost:5001` (pantalla ⚙)
 
 ## Flujo
@@ -36,9 +36,13 @@ python3 app.py
 
 ## Sesión
 
-- Se guarda localmente (`config.json`: email, usuario, cookies, fechas);
-  **nunca** el password. Al rearrancar se valida con `GET /session`: si
-  expiró, aviso controlado + regreso al diálogo de autenticación.
+- Se guarda localmente (`config.json`: email, usuario, cookies, token JWT,
+  fechas); **nunca** el password. Al rearrancar se valida con `GET /session`:
+  si expiró, aviso controlado + regreso al diálogo de autenticación.
+- El login devuelve además un JWT (`token`, `tokenType: Bearer`, 1 h) que la
+  app adjunta como `Authorization: Bearer` en cada escritura de libros
+  (`POST/PUT/PATCH/DELETE` → 401 sin él, 403 si expiró). El JWT vence antes
+  que la cookie (8 h): al expirar se pide login de nuevo.
 - Aviso amarillo cuando falta poco para el vencimiento estimado (8 h).
 
 ## Libros (siempre JSON: `?output=json`)

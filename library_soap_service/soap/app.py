@@ -240,16 +240,22 @@ def index():
 
 @app.get("/health")
 def health():
+    warnings = []
+    if not config.jwt_configured():
+        warnings.append("JWT_SECRET sin fijar: la validacion Bearer no es segura.")
     try:
         info = db.ping()
         payload = {"status": "ok", "database": info["db"], "user": info["usr"],
                    "schema": config.PGSCHEMA,
-                   "server": info["version"].split(" on ")[0]}
+                   "server": info["version"].split(" on ")[0],
+                   "jwt": "ok" if config.jwt_configured() else "missing_secret"}
         status = 200
     except Exception as exc:                       # noqa: BLE001 - se reporta al cliente
         payload = {"status": "error", "database": config.PGDATABASE,
                    "message": str(exc).strip()}
         status = 503
+    if warnings:
+        payload["warnings"] = warnings
     return respond(payload, serializers.dict_element("health", payload), status=status)
 
 

@@ -7,3 +7,5 @@ node_modules/
 .env
 !.env.example
 CONTEXT.md
+# resto de cookie de curl (archivo "jar" colado en Implementacion con JWT)
+jar

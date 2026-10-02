@@ -13,7 +13,7 @@ DEFAULTS = {
         "poll": 15,
     },
     "session": {"email": None, "user": None, "cookies": None,
-                "saved_at": None, "login_at": None},
+                "token": None, "saved_at": None, "login_at": None},
 }
 
 # La cookie de Flask es opaca: el servidor no dice cuándo vence.
@@ -50,12 +50,13 @@ def save(config):
     return config
 
 
-def save_session(config, email, user, cookies, login_at=None):
+def save_session(config, email, user, cookies, token=None, login_at=None):
     from datetime import datetime, timezone
     config["session"] = {
         "email": email,
         "user": user,
         "cookies": cookies or {},
+        "token": token,
         "saved_at": datetime.now(timezone.utc).isoformat(),
         "login_at": login_at,
     }
@@ -64,7 +65,7 @@ def save_session(config, email, user, cookies, login_at=None):
 
 def clear_session(config):
     config["session"] = {"email": None, "user": None, "cookies": None,
-                         "saved_at": None, "login_at": None}
+                         "token": None, "saved_at": None, "login_at": None}
     return save(config)
 
 

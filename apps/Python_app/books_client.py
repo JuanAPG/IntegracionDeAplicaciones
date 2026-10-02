@@ -22,6 +22,17 @@ class BooksClient:
         self.timeout = timeout
         self.session = requests.Session()
         self.session.headers.update({"Accept": "application/json"})
+        self._token = None
+
+    def set_token(self, token):
+        """Fija el JWT Bearer para las escrituras (POST/PUT/PATCH/DELETE).
+        Las lecturas son publicas y no lo necesitan."""
+        self._token = token or None
+
+    def _auth_headers(self):
+        if self._token:
+            return {"Authorization": f"Bearer {self._token}"}
+        return {}
 
     def _get(self, path, params=None):
         p = dict(params or {})
@@ -112,6 +123,7 @@ class BooksClient:
         try:
             r = self.session.request(method, f"{self.base_url}{path}",
                                      params={"output": "json"}, json=payload,
+                                     headers=self._auth_headers(),
                                      timeout=self.timeout)
         except requests.RequestException as exc:
             return False, f"Servicio no disponible — sin conexión con {self.base_url}: {exc}", None
@@ -121,7 +133,11 @@ class BooksClient:
             except Exception:
                 return True, "", {}
         msg = _err(r, "Operación rechazada")
-        if r.status_code == 409:
+        if r.status_code == 401:
+            msg = ("Falta el token de sesión — vuelve a iniciar sesión. " + msg)
+        elif r.status_code == 403:
+            msg = ("Sesión sin permiso o token expirado — vuelve a iniciar sesión. " + msg)
+        elif r.status_code == 409:
             msg = f"ISBN duplicado — ya existe un libro con ese ISBN. {msg}"
         elif r.status_code == 404:
             msg = f"Libro inexistente — no hay libro con ese id/ISBN. {msg}"
@@ -141,12 +157,19 @@ class BooksClient:
     def delete(self, book_id):
         try:
             r = self.session.delete(f"{self.base_url}/books/{book_id}",
-                                    params={"output": "json"}, timeout=self.timeout)
+                                    params={"output": "json"},
+                                    headers=self._auth_headers(),
+                                    timeout=self.timeout)
         except requests.RequestException as exc:
             return False, f"Sin conexión: {exc}"
         if r.status_code in (200, 204):
             return True, "Libro eliminado."
-        return False, _err(r, "No se pudo eliminar")
+        msg = _err(r, "No se pudo eliminar")
+        if r.status_code == 401:
+            msg = "Falta el token de sesión — vuelve a iniciar sesión. " + msg
+        elif r.status_code == 403:
+            msg = "Sesión sin permiso o token expirado — vuelve a iniciar sesión. " + msg
+        return False, msg
 
 
 # ---- helpers de presentación ----

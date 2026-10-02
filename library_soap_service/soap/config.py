@@ -7,11 +7,15 @@ import os
 
 from dotenv import load_dotenv
 
-# .env vive en la raiz del proyecto (library/), compartido por todos los
-# microservicios. Se camina hacia arriba desde este archivo para encontrarlo.
+# .env compartido en la raiz del proyecto (library/), mas .env local del
+# servicio como respaldo para despliegues en /opt/library (systemd).
+# Orden de precedencia: entorno real > .env raiz > .env local.
+# Asi se escala a mas micros: todos leen el mismo JWT_SECRET sin duplicarlo.
 _PROJECT_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 load_dotenv(os.path.join(_PROJECT_ROOT, ".env"), override=False)
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         ".env"), override=False)
 
 
 def _int(name, default):
@@ -47,6 +51,12 @@ API_PREFIX = os.getenv("API_PREFIX", "").rstrip("/")
 # ---------------------------------------------------------------------
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
+
+def jwt_configured():
+    """True si hay un secreto JWT real (no vacio ni valor de ejemplo)."""
+    return bool(JWT_SECRET and JWT_SECRET not in ("", "change-me",
+                                                  "CAMBIEME_secreto_jwt_compartido"))
 
 # ---------------------------------------------------------------------
 # PostgreSQL

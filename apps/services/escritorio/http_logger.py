@@ -2,24 +2,33 @@
 apps/services/escritorio/http_logger.py
 Logger de trafico HTTP para la consola.
 
-Imprime cada peticion y respuesta con formato legible, resaltando
-el token Bearer en los encabezados. Util para depuracion en desarrollo.
+Imprime cada peticion y respuesta con formato legible. Por seguridad, el
+token Bearer se muestra redactado salvo que se pida explicito (el token
+completo nunca debe quedar en logs ni capturas):
 
-Uso:
-    from http_logger import log_request, log_response
-
-    log_request("POST", "http://localhost:5000/login", headers, body)
-    log_response(200, response_headers, response_body)
+    log_request("POST", url, headers, body)              # redactado
+    log_request("POST", url, headers, body, full=True)   # token completo
+    LOGIN_DEBUG_FULL_TOKEN=1 python Ejercicio1.py        # siempre completo
 """
 import json
+import os
 
 
-def _format_headers(headers, highlight_auth=True):
-    """Formatea encabezados HTTP, mostrando el token Bearer completo."""
+def _redact(value):
+    """Muestra solo el encabezado del token para depurar sin filtrarlo."""
+    scheme, _, token = value.partition(" ")
+    if not token:
+        return value
+    return f"{scheme} {token[:12]}…({len(token)} chars, redactado)"
+
+
+def _format_headers(headers, highlight_auth=True, full=False):
+    """Formatea encabezados HTTP, redactando el token Bearer por omision."""
+    show_full = full or os.getenv("LOGIN_DEBUG_FULL_TOKEN", "") == "1"
     lines = []
     for key, value in headers.items():
         if highlight_auth and key.lower() == "authorization" and value.startswith("Bearer "):
-            lines.append(f"  {key}: {value}")
+            lines.append(f"  {key}: {value if show_full else _redact(value)}")
         else:
             lines.append(f"  {key}: {value}")
     return "\n".join(lines)
@@ -39,7 +48,7 @@ def _format_body(body):
     return str(body)
 
 
-def log_request(method, url, headers=None, body=None):
+def log_request(method, url, headers=None, body=None, full=False):
     """Imprime una peticion HTTP saliente en consola.
 
     Args:
@@ -47,13 +56,14 @@ def log_request(method, url, headers=None, body=None):
         url: URL completa
         headers: Diccionario de encabezados (opcional)
         body: Cuerpo de la peticion (opcional)
+        full: True para mostrar el token Bearer completo (solo depuracion)
     """
     print("\n" + "=" * 70)
     print(f">>> PETICION {method.upper()}")
     print(f"    URL: {url}")
     if headers:
         print("    Encabezados:")
-        print(_format_headers(headers))
+        print(_format_headers(headers, full=full))
     if body:
         print("    Cuerpo:")
         print(f"    {_format_body(body)}")

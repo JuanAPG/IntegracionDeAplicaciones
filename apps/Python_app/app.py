@@ -11,14 +11,18 @@ from ui_books import LibraryApp
 def make_login(cfg):
     login_url, _books, timeout, _poll = config_store.endpoints(cfg)
     c = LoginClient(login_url, timeout)
-    saved = (cfg.get("session") or {}).get("cookies") or {}
-    c.restore_cookies(saved)
+    saved = cfg.get("session") or {}
+    c.restore_cookies(saved.get("cookies") or {})
+    c.set_token(saved.get("token"))
     return c
 
 
-def make_books(cfg):
+def make_books(cfg, token=None):
     _login, books_url, timeout, _poll = config_store.endpoints(cfg)
-    return BooksClient(books_url, timeout)
+    b = BooksClient(books_url, timeout)
+    b.set_token(token if token is not None
+                else (cfg.get("session") or {}).get("token"))
+    return b
 
 
 def main():
@@ -26,9 +30,10 @@ def main():
     login_client = make_login(cfg)
     books_client = make_books(cfg)
 
-    def save_session(email, user, cookies):
+    def save_session(email, user, cookies, token=None):
         nonlocal cfg
-        cfg = config_store.save_session(cfg, email, user, cookies)
+        cfg = config_store.save_session(cfg, email, user, cookies, token=token)
+        books_client.set_token(token)
         return cfg
 
     # Instancia real

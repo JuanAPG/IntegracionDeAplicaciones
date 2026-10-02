@@ -1,4 +1,12 @@
-"""Cliente del microservicio login. Siempre pide JSON (?format=json)."""
+"""Cliente del microservicio login. Siempre pide JSON (?format=json).
+
+Guarda el token JWT (Bearer, 1 h) junto a la cookie de sesion Flask:
+las escrituras en el microservicio de libros exigen
+`Authorization: Bearer <token>` (401 sin el, 403 si es invalido/expiro).
+"""
+import base64
+import json
+
 import requests
 
 
@@ -24,6 +32,29 @@ class LoginClient:
         self.timeout = timeout
         self.session = requests.Session()
         self.session.headers.update({"Accept": "application/json"})
+        self._token = None
+
+    @property
+    def token(self):
+        """El JWT Bearer actual, o None si no hay login vigente."""
+        return self._token
+
+    def set_token(self, token):
+        self._token = token or None
+
+    def token_expired(self):
+        """True si el JWT ya expiro (claim exp vs hora local, sin verificar
+        firma: la verificacion la hace el servidor)."""
+        if not self._token:
+            return True
+        try:
+            import time
+            payload = self._token.split(".")[1]
+            payload += "=" * (-len(payload) % 4)
+            exp = json.loads(base64.urlsafe_b64decode(payload)).get("exp")
+            return exp is not None and exp <= int(time.time())
+        except Exception:
+            return False
 
     def restore_cookies(self, cookies):
         if cookies:
@@ -133,7 +164,9 @@ class LoginClient:
                 data = r.json()
             except Exception:
                 data = {}
+            self._token = data.get("token") or None
             return True, "Sesión iniciada.", data.get("user", {}), ""
+        self._token = None
         msg, status, code = _err(r, "No se pudo iniciar sesión")
         if status == 401:
             msg = "Usuario no encontrado o credenciales inválidas."
@@ -147,6 +180,7 @@ class LoginClient:
                               timeout=self.timeout)
         except requests.RequestException:
             pass
+        self._token = None
         try:
             self.session.cookies.clear()
         except Exception:

@@ -424,9 +424,14 @@ sudo -u library /opt/library/soap/.venv/bin/pip install -r /opt/library/soap/req
 
 ```bash
 sudo -u library cp /opt/library/soap/.env.example /opt/library/soap/.env
-sudo -u library vi /opt/library/soap/.env        # PGPASSWORD y CORS_ORIGINS
+sudo -u library vi /opt/library/soap/.env        # PGPASSWORD, JWT_SECRET y CORS_ORIGINS
 sudo chmod 600 /opt/library/soap/.env            # solo el servicio lo lee
 ```
+
+El `JWT_SECRET` debe ser **el mismo** que el del login (ver `.env` de la raiz
+del repo); sin el, `/health` reporta `jwt: missing_secret` y las escrituras
+(`POST/PUT/PATCH/DELETE /books`, que exigen `Authorization: Bearer <token>`)
+no son seguras.
 
 En produccion enumere los origenes en lugar de dejar `*`:
 
@@ -448,10 +453,10 @@ Wants=network-online.target
 Type=simple
 User=library
 Group=library
-WorkingDirectory=/opt/library/soap/soap
+WorkingDirectory=/opt/library/soap
 ExecStart=/opt/library/soap/.venv/bin/gunicorn \
           --workers 3 --bind 127.0.0.1:5001 \
-          --access-logfile - --error-logfile - wsgi:application
+          --access-logfile - --error-logfile - soap.wsgi:application
 Restart=on-failure
 RestartSec=5
 
