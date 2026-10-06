@@ -1,48 +1,35 @@
 """
 apps/services/login/login/jwt_utils.py
-JWT generation and authentication token management.
+Compatibilidad: la emision y verificacion de JWT vive ahora en el paquete
+compartido packages/library_common (library_common.jwt_auth), para que los
+seis microservicios usen EXACTAMENTE el mismo codigo de firma, los mismos
+claims y la misma lista de revocacion.
 
-Uses PyJWT with a shared secret (JWT_SECRET) loaded from the root .env.
-The token includes claims: sub (user_id), email, role, iat, exp.
-Expiration defaults to 1 hour (configurable via JWT_EXPIRATION_HOURS).
+Este modulo se conserva porque habia codigo y documentacion apuntando a
+sus dos funciones. Lo nuevo deberia usar login/sessions.py, que ademas de
+emitir el token abre la sesion en Redis y entrega el refresh token.
 """
-from datetime import datetime, timedelta, timezone
-
-import jwt
-
-from . import config
+from .shared import codec
 
 
-def generate_jwt(user_id, email, role):
-    """Generate a signed JWT token for the authenticated user.
-
-    Returns the token string. Claims:
-        sub  — user ID (standard JWT subject)
-        email — user's email address
-        role  — user role (admin/user)
-        iat  — issued at (UTC)
-        exp  — expiration (UTC)
+def generate_jwt(user_id, email, role, role_id=2, sid=None):
     """
-    now = datetime.now(timezone.utc)
-    payload = {
-        "sub": str(user_id),
-        "email": email,
-        "role": role,
-        "iat": now,
-        "exp": now + timedelta(hours=config.JWT_EXPIRATION_HOURS),
-    }
-    token = jwt.encode(payload, config.JWT_SECRET, algorithm=config.JWT_ALGORITHM)
-    # PyJWT >= 2.x returns str; ensure consistent type
-    if isinstance(token, bytes):
-        token = token.decode("utf-8")
+    Emite un token de acceso (30 minutos) y devuelve solo la cadena.
+
+    Nota: un token emitido por aqui NO tiene sesion ni refresh asociados.
+    Para el flujo completo de /login use sessions.open_session.
+    """
+    token, _claims = codec.issue_access_token(
+        user_id=user_id, email=email, role=role, role_id=role_id, sid=sid)
     return token
 
 
 def verify_jwt(token):
-    """Verify a JWT token and return its payload.
-
-    Raises:
-        jwt.ExpiredSignatureError — token has expired
-        jwt.InvalidTokenError — token is invalid (bad signature, malformed, etc.)
     """
-    return jwt.decode(token, config.JWT_SECRET, algorithms=[config.JWT_ALGORITHM])
+    Verifica firma, algoritmo, vencimiento, emisor, claims obligatorios y
+    lista de revocacion. Devuelve los claims.
+
+    Lanza library_common.errors.Unauthorized (401) si el token no sirve y
+    RedisUnavailable (503) si no se pudo consultar la revocacion.
+    """
+    return codec.decode(token)

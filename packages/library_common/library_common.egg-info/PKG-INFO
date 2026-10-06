@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: library-common
+Version: 1.0.0
+Summary: Capa compartida de la libreria en linea: Redis, JWT, roles, negociacion XML/JSON y metricas
+Requires-Python: >=3.9
+Requires-Dist: Flask<4,>=3.0
+Requires-Dist: PyJWT<3,>=2.8
+Requires-Dist: redis<7,>=5.0
+Requires-Dist: python-dotenv<2,>=1.0

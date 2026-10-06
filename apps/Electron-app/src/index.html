@@ -103,6 +103,22 @@
         <svg class="btn__icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-refresh"/></svg>
       </button>
 
+      <!-- Rastreo del envio: PUBLICO, no necesita sesion. Va antes del
+           boton de sesion a proposito, para dejar claro que se puede
+           usar sin entrar. -->
+      <button type="button" class="btn btn--ghost" id="btn-tracking"
+              title="Rastrear un envio por su numero de pedido">
+        Rastrear envio
+      </button>
+
+      <button type="button" class="btn btn--ghost" id="btn-orders" hidden>
+        Mis pedidos
+      </button>
+
+      <button type="button" class="btn btn--ghost" id="btn-session">
+        Iniciar sesion
+      </button>
+
       <button type="button" class="btn btn--ghost" id="btn-settings">
         <svg class="btn__icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-settings"/></svg>
         Configuracion
@@ -228,9 +244,15 @@
     </form>
   </dialog>
 
+  <!-- El orden importa: config y xml no dependen de nadie; auth usa el
+       puente del preload; services usa config, xml y auth; panels usa
+       ui y services; app.js los orquesta al final. -->
   <script src="js/config.js"></script>
   <script src="js/xml.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/services.js"></script>
+  <script src="js/panels.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

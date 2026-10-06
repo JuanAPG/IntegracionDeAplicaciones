@@ -16,10 +16,24 @@ Endpoints:
   POST /register  alta (nombre, apellido paterno/materno, email, password)
   GET  /verify    canje del token enviado por sendmail (?token=...)
   GET  /validate-email  validacion previa: sintaxis, unicidad y registro
-  POST /login     verifica credenciales y crea la sesion Flask
-  POST /logout    cierra la sesion
+  POST /login     verifica credenciales, abre sesion y emite los tokens
+  POST /refresh   canjea el refresh token por un par nuevo (rotacion)
+  POST /logout    cierra la sesion y REVOCA el token de acceso
   GET  /session   dice si hay sesion autenticada y quien es
-  GET  /health    estado del servicio y de PostgreSQL
+  GET  /health    estado del servicio, de PostgreSQL y de Redis
+  GET  /metrics   contadores del proceso y estado del servidor Redis
+
+ESTE SERVICIO ES EL UNICO EMISOR DE JWT
+  Firma HS256 con JWT_SECRET_KEY (el mismo secreto en los seis
+  microservicios, siempre por variable de entorno). El token de acceso
+  dura 30 minutos y lleva user_id, role_id, sid y jti; los demas
+  servicios lo verifican y consultan jwt:revoked:<jti> en Redis antes de
+  aceptarlo.
+
+REDIS ES OBLIGATORIO PARA /login, /refresh, /logout y /session
+  Son operaciones de sesion y revocacion: si Redis no responde se
+  devuelve 503 en lugar de emitir una credencial que despues no se
+  podria retirar. Es un fallo seguro, no una degradacion.
 """
 import logging
 from datetime import datetime, timezone
@@ -30,23 +44,31 @@ from flask import Flask, Response, jsonify, request, session
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
+from . import _bootstrap  # noqa: F401  (deja library_common importable)
 from . import config
 from . import db
-from . import jwt_utils
+from . import jwt_utils  # noqa: F401  (compatibilidad; el flujo usa sessions)
 from . import mailer as mail_sender
 from . import openapi
 from . import serializers
+from . import sessions as session_box
 from . import tokens as token_box
 from . import users_repository as repo
 from . import validators
 from .errors import ApiError, Conflict, EmailNotVerified, Gone, NotFound, Unauthorized, ValidationError
 from .mailer import MailerError  # noqa: F401  (se documenta el 503 en openapi.py)
 from .security import hash_password, verify_password
+from .shared import codec, negotiator, store
+from library_common import logging_support, metrics
+from library_common.errors import ApiError as SharedApiError
+from library_common.errors import DependencyUnavailable
+from library_common.flask_support import metrics_payload
+from library_common.jwt_auth import bearer_token
 
-logging.basicConfig(
-    level=logging.DEBUG if config.DEBUG else logging.INFO,
-    format="%(asctime)s %(levelname)-7s %(message)s")
-log = logging.getLogger("library.login")
+# El filtro de secretos se instala en el logger raiz: ni contrasenas, ni
+# tokens, ni la URL de Redis con su clave acaban en los registros.
+log = logging_support.configure(
+    logging.DEBUG if config.DEBUG else logging.INFO, service="login")
 
 app = Flask(__name__)
 # Mantiene el orden en que se construye el diccionario en lugar del
@@ -71,11 +93,37 @@ CORS(
     app,
     resources={r"/*": {"origins": config.CORS_ORIGINS}},
     methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Accept", "Origin", "X-Requested-With"],
+    # Authorization: /logout acepta el token por encabezado Bearer, no
+    # solo por cookie, para que lo puedan cerrar los clientes de
+    # escritorio que no guardan cookies.
+    allow_headers=["Content-Type", "Accept", "Origin", "X-Requested-With",
+                   "Authorization"],
     expose_headers=["Content-Type", "Content-Length", "Location"],
     supports_credentials=True,
     max_age=config.CORS_MAX_AGE,
 )
+if config.SHARED.cors_wildcard:
+    log.warning("CORS_ORIGINS='*' con cookies de sesion: el navegador lo "
+                "rechazara. Enumere los origenes de los clientes en el .env")
+
+# Metricas por peticion (las publica GET /metrics).
+@app.before_request
+def _metrics_start():
+    request.environ["library.started_at"] = __import__("time").perf_counter()
+
+
+@app.after_request
+def _metrics_end(response):
+    started = request.environ.get("library.started_at")
+    if started is not None:
+        metrics.observe(f"http.{request.method.lower()}",
+                        (__import__("time").perf_counter() - started) * 1000.0)
+    metrics.incr("http.requests")
+    metrics.incr(f"http.status.{response.status_code // 100}xx")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Cache-Control", "no-store")
+    return response
 
 
 # ---------------------------------------------------------------------
@@ -194,15 +242,48 @@ def _verify_url(token):
     return f"{base}/verify?token={token}"
 
 
-def _current_user():
-    user_id = session.get("user_id")
-    if not user_id:
+def _current_sid():
+    """
+    El identificador de sesion, de la cookie o del token Bearer.
+
+    La cookie ya no lleva el estado de la sesion, solo el sid; el estado
+    vive en Redis (ver login/sessions.py) y por eso una sesion se puede
+    cerrar del lado del servidor.
+    """
+    sid = session.get("sid")
+    if sid:
+        return sid
+    # Cliente sin cookies (escritorio): el sid viaja dentro del JWT.
+    token = bearer_token(required=False)
+    if not token:
         return None
     try:
-        row = repo.get_by_id(int(user_id))
+        return codec.decode(token).get("sid")
+    except (SharedApiError, Unauthorized):
+        return None
+
+
+def _current_user():
+    """
+    La cuenta de la sesion vigente, o None.
+
+    Dos comprobaciones, no una: la sesion debe seguir viva en Redis Y la
+    cuenta debe seguir existiendo y activa en PostgreSQL. Una cuenta
+    desactivada deja de tener sesion en el acto.
+    """
+    sid = _current_sid()
+    if not sid:
+        return None
+    record = session_box.read_session(sid)
+    if not isinstance(record, dict):
+        session.clear()
+        return None
+    try:
+        row = repo.get_by_id(int(record.get("user_id")))
     except (TypeError, ValueError):
         row = None
-    if row is None:
+    if row is None or not row.get("is_active", True):
+        session_box.close_session(sid)
         session.clear()
         return None
     return row
@@ -226,10 +307,12 @@ def index():
             {"method": "POST", "path": "/register", "description": "Registrar un nuevo usuario"},
             {"method": "GET", "path": "/verify", "description": "Verificar el correo con el token del sendmail"},
             {"method": "GET", "path": "/validate-email", "description": "Validacion previa del correo"},
-            {"method": "POST", "path": "/login", "description": "Autenticar e iniciar sesion"},
-            {"method": "POST", "path": "/logout", "description": "Cerrar la sesion"},
+            {"method": "POST", "path": "/login", "description": "Autenticar, abrir sesion y emitir los tokens"},
+            {"method": "POST", "path": "/refresh", "description": "Canjear el refresh token por un par nuevo (rotacion)"},
+            {"method": "POST", "path": "/logout", "description": "Cerrar la sesion y revocar el token de acceso"},
             {"method": "GET", "path": "/session", "description": "Consultar la sesion autenticada"},
-            {"method": "GET", "path": "/health", "description": "Estado del servicio y de la base de datos"},
+            {"method": "GET", "path": "/health", "description": "Estado del servicio, de PostgreSQL y de Redis"},
+            {"method": "GET", "path": "/metrics", "description": "Contadores del proceso y estado de Redis"},
             {"method": "GET", "path": "/docs", "description": "Documentacion interactiva (Swagger UI)"},
         ],
     }
@@ -238,27 +321,59 @@ def index():
 
 @app.get("/health")
 def health():
-    warnings = []
-    if not config.SECRET_KEY:
-        warnings.append("SECRET_KEY sin fijar: las sesiones no son seguras.")
-    if not config.jwt_configured():
-        warnings.append("JWT_SECRET sin fijar: los tokens Bearer no son seguros.")
+    """
+    Estado del servicio y de sus dos dependencias.
+
+    PostgreSQL y Redis son AMBOS indispensables aqui: sin base no hay
+    credenciales que verificar y sin Redis no hay sesion ni revocacion.
+    Por eso cualquiera de los dos caido devuelve 503 y los semaforos de
+    las aplicaciones de escritorio lo pintan en rojo.
+    """
+    warnings = config.warnings()
+    redis_block = store.health()
+    redis_ok = redis_block.get("status") == "ok"
     try:
         info = db.ping()
-        payload = {"status": "ok", "database": info["db"], "user": info["usr"],
+        payload = {"status": "ok" if redis_ok else "degraded",
+                   "database": info["db"], "user": info["usr"],
                    "schema": config.PGSCHEMA,
                    "server": info["version"].split(" on ")[0],
                    "sessionSigning": "ok" if config.SECRET_KEY else "missing_secret",
                    "jwt": "ok" if config.jwt_configured() else "missing_secret",
+                   "jwtAccessTtl": config.JWT_ACCESS_TTL,
+                   "jwtRefreshTtl": config.JWT_REFRESH_TTL,
+                   "redis": redis_block,
                    "mailer": f"{config.SMTP_HOST}:{config.SMTP_PORT}"}
-        status = 200
+        status = 200 if redis_ok else 503
+        if not redis_ok:
+            warnings.append("Redis no responde: /login, /refresh, /logout y "
+                            "/session devolveran 503 (fallo seguro).")
     except Exception as exc:                       # noqa: BLE001 - se reporta al cliente
         payload = {"status": "error", "database": config.PGDATABASE,
-                   "message": str(exc).strip()}
+                   "message": str(exc).strip(), "redis": redis_block}
         status = 503
     if warnings:
         payload["warnings"] = warnings
     return respond(payload, serializers.dict_element("health", payload), status=status)
+
+
+@app.get("/metrics")
+def service_metrics():
+    """
+    Contadores del proceso y estado del servidor Redis compartido.
+
+    No lleva datos de ningun usuario: solo agregados (peticiones por
+    codigo, aciertos y fallos de cache, tokens emitidos, rechazados y
+    revocados, latencias). Con gunicorn --workers N los contadores son
+    del trabajador que atendio la peticion; el bloque "redis" si es
+    global, porque viene del servidor.
+    """
+    payload = metrics_payload("library-login-service", store, {
+        "jwtAccessTtl": config.JWT_ACCESS_TTL,
+        "jwtRefreshTtl": config.JWT_REFRESH_TTL,
+        "sessionTtl": config.SESSION_TTL,
+    })
+    return respond(payload, serializers.dict_element("metrics", payload))
 
 
 # =====================================================================
@@ -410,42 +525,161 @@ def login():
             "El correo aun no esta verificado.",
             ["Abra el enlace que se envio por correo (GET /verify?token=...)."])
 
+    # La sesion y el refresh token viven en Redis; el token de acceso
+    # (30 min) lo firma este servicio. Si Redis no responde, open_session
+    # lanza 503: no se emite una credencial que no se pudiera revocar.
+    sid, access_token, refresh_token, claims = session_box.open_session(row)
+
     session.clear()
     session.permanent = True
-    session["user_id"] = row["id"]
+    session["sid"] = sid                       # la cookie solo lleva el sid
     session["login_at"] = datetime.now(timezone.utc).isoformat()
     repo.set_last_login(row["id"])
-
-    # Generar token JWT para el cliente
-    token = jwt_utils.generate_jwt(row["id"], row["email"], row["role"])
-    expires_in = int(config.JWT_EXPIRATION_HOURS * 3600)
+    metrics.incr("auth.login")
 
     payload = {
         "authenticated": True,
         "user": repo.public_user(repo.get_by_id(row["id"])),
-        "token": token,
+        "token": access_token,
         "tokenType": "Bearer",
-        "expiresIn": expires_in,
+        "expiresIn": session_box.expires_in(claims),
+        "refreshToken": refresh_token,
+        "refreshExpiresIn": config.JWT_REFRESH_TTL,
+        # El cliente deberia renovar cuando falte menos de esto, para no
+        # quedarse nunca con un token caducado en la mano.
+        "renewBefore": config.JWT_RENEW_BEFORE,
     }
-    return respond(payload, serializers.dict_element("session", payload))
+    # El XML no publica los tokens: un XML suele quedarse en archivos y
+    # registros intermedios. Quien quiera los tokens pide ?format=json.
+    element = serializers.dict_element("session", {
+        "authenticated": True,
+        "user": repo.public_user(repo.get_by_id(row["id"])),
+        "tokenType": "Bearer",
+        "expiresIn": session_box.expires_in(claims),
+        "refreshExpiresIn": config.JWT_REFRESH_TTL,
+        "renewBefore": config.JWT_RENEW_BEFORE,
+        "note": "Pida ?format=json para recibir el token y el refreshToken.",
+    })
+    return respond(payload, element)
+
+
+@app.post("/refresh")
+def refresh():
+    """
+    Canjea el refresh token por un par nuevo (ROTACION).
+
+    El token de acceso dura 30 minutos y debe renovarse ANTES de caducar.
+    El refresh es de UN SOLO USO: al canjearlo se borra y se entrega otro.
+    El token de acceso anterior queda revocado en el acto, de modo que no
+    siguen vivos dos tokens del mismo usuario.
+
+    Respuestas: 200 par nuevo · 400 falta el token · 401 refresh invalido,
+    ya usado o caducado · 403 cuenta desactivada · 503 Redis caido.
+    """
+    data = read_payload()
+    raw = _pick(data, "refreshToken", "refresh_token", "token") or \
+        (request.args.get("refreshToken") or "").strip()
+    if not raw:
+        raise ValidationError(
+            "Falta el refresh token.",
+            ["Envie {\"refreshToken\": \"...\"} en el cuerpo."])
+
+    # De quien es el refresh lo dice Redis; la cuenta se relee de
+    # PostgreSQL para que un usuario desactivado o con el rol cambiado no
+    # pueda seguir renovando con los datos de antes.
+    record = store.strict_get(store.refresh_key(raw))
+    if not isinstance(record, dict):
+        metrics.incr("auth.refresh.rejected")
+        raise Unauthorized(
+            "El refresh token no es valido, ya se uso o caduco.",
+            ["Inicie sesion de nuevo."])
+
+    row = repo.get_by_id(int(record.get("user_id", 0)))
+    if row is None:
+        store.drop_refresh(raw)
+        raise Unauthorized("La cuenta del refresh token ya no existe.")
+    if not row.get("is_active", True):
+        store.drop_refresh(raw)
+        raise Unauthorized("La cuenta esta desactivada.")
+
+    rotated = session_box.rotate(raw, row)
+    if rotated is None:
+        metrics.incr("auth.refresh.rejected")
+        raise Unauthorized(
+            "El refresh token no es valido, ya se uso o caduco.",
+            ["Inicie sesion de nuevo."])
+
+    sid, access_token, refresh_token, claims = rotated
+    session["sid"] = sid
+    session.permanent = True
+    metrics.incr("auth.refresh")
+
+    payload = {
+        "authenticated": True,
+        "user": repo.public_user(row),
+        "token": access_token,
+        "tokenType": "Bearer",
+        "expiresIn": session_box.expires_in(claims),
+        "refreshToken": refresh_token,
+        "refreshExpiresIn": config.JWT_REFRESH_TTL,
+        "renewBefore": config.JWT_RENEW_BEFORE,
+    }
+    element = serializers.dict_element("session", {
+        "authenticated": True,
+        "user": repo.public_user(row),
+        "tokenType": "Bearer",
+        "expiresIn": session_box.expires_in(claims),
+        "note": "Pida ?format=json para recibir el token y el refreshToken.",
+    })
+    return respond(payload, element)
 
 
 @app.post("/logout")
 def logout():
-    """Cierra la sesion (funciona aunque no haya sesion abierta)."""
+    """
+    Cierra la sesion y REVOCA el token de acceso.
+
+    Es idempotente: sin sesion abierta responde 200 igual. Lo importante
+    es lo que ocurre cuando si la hay: el jti del token entra en
+    jwt:revoked:<jti> y los SEIS microservicios lo rechazan de inmediato,
+    sin esperar los 30 minutos de su vencimiento.
+
+    Acepta el token por cookie de sesion o por Authorization: Bearer.
+    """
+    sid = _current_sid()
+    claims = None
+    token = bearer_token(required=False)
+    if token:
+        try:
+            claims = codec.decode(token)
+        except (SharedApiError, Unauthorized):
+            # Un token ya invalido no impide cerrar la sesion de la cookie.
+            claims = None
+
+    done = session_box.close_session(sid, claims) if (sid or claims) else {
+        "sessionRemoved": False, "accessRevoked": False, "refreshRemoved": False}
     session.clear()
-    payload = {"authenticated": False, "message": "Sesion cerrada."}
+    metrics.incr("auth.logout")
+
+    payload = {"authenticated": False, "message": "Sesion cerrada.", **done}
     return respond(payload, serializers.dict_element("session", payload))
 
 
 @app.get("/session")
 def get_session():
-    """Dice si hay sesion autenticada y, en ese caso, quien es."""
+    """
+    Dice si hay sesion autenticada y, en ese caso, quien es.
+
+    Consultarla RENUEVA el TTL de la sesion en Redis (ventana
+    deslizante): la sesion vive mientras se use y caduca sola a las 8 h
+    de inactividad.
+    """
     row = _current_user()
     if row is None:
         payload = {"authenticated": False}
     else:
-        payload = {"authenticated": True, "user": repo.public_user(row)}
+        payload = {"authenticated": True, "user": repo.public_user(row),
+                   "sessionTtl": config.SESSION_TTL}
     return respond(payload, serializers.dict_element("session", payload))
 
 
@@ -461,6 +695,29 @@ def _error_response(status, code, message, details=None):
 
 @app.errorhandler(ApiError)
 def handle_api_error(exc):
+    return _error_response(exc.status, exc.code, exc.message, exc.details)
+
+
+@app.errorhandler(SharedApiError)
+def handle_shared_api_error(exc):
+    """
+    Errores que levanta el paquete compartido: 401 de token ausente,
+    invalido, caducado o revocado; 403 de rol insuficiente; 503 de Redis.
+    Misma forma de respuesta que los propios del servicio.
+    """
+    if exc.status >= 500:
+        log.error("%s: %s", exc.code, exc.message)
+    return _error_response(exc.status, exc.code, exc.message, exc.details)
+
+
+@app.errorhandler(DependencyUnavailable)
+def handle_dependency_down(exc):
+    """
+    Redis caido en una operacion de sesion o revocacion. Es un fallo
+    SEGURO y deliberado: antes que emitir o aceptar una credencial que no
+    se pueda revocar, se responde 503.
+    """
+    log.error("Dependencia no disponible (%s): %s", exc.code, exc.message)
     return _error_response(exc.status, exc.code, exc.message, exc.details)
 
 
@@ -496,7 +753,14 @@ if __name__ == "__main__":
     log.info("PostgreSQL -> %s@%s:%s/%s (esquema %s)",
              config.PGUSER, config.PGHOST, config.PGPORT, config.PGDATABASE, config.PGSCHEMA)
     log.info("sendmail -> %s:%s (remitente %s)", config.SMTP_HOST, config.SMTP_PORT, config.SMTP_FROM)
+    # Se registra la URL REDACTADA: la contrasena de Redis no va al log.
+    from library_common.env import redacted
+    log.info("Redis -> %s (sesiones %ss, acceso %ss, refresh %ss)",
+             redacted(config.REDIS_URL) or "SIN CONFIGURAR",
+             config.SESSION_TTL, config.JWT_ACCESS_TTL, config.JWT_REFRESH_TTL)
     log.info("CORS origins -> %s", ", ".join(config.CORS_ORIGINS))
+    for item in config.warnings():
+        log.warning(item)
     # load_dotenv=False: config.py ya cargo el .env por ruta absoluta; el
     # autoload de Flask resuelve desde el cwd y falla si este fue borrado.
     app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG,

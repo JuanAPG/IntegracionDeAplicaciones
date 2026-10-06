@@ -10,9 +10,12 @@ data/login_migration.sql).
 """
 from . import db
 
+# role_id lo anade data/roles_migration.sql y viaja en el JWT, que es
+# donde los otros cinco microservicios leen el rol del usuario.
 PUBLIC_COLUMNS = (
     "id, first_name, last_name_paternal, last_name_maternal, full_name, "
-    "email, role, email_verified, is_active, created_at, updated_at, last_login_at"
+    "email, role, role_id, email_verified, is_active, created_at, updated_at, "
+    "last_login_at"
 )
 
 
@@ -28,6 +31,7 @@ def public_user(row):
         "fullName": row.get("full_name"),
         "email": row["email"],
         "role": row["role"],
+        "roleId": row.get("role_id"),
         "emailVerified": bool(row.get("email_verified")),
         "isActive": bool(row.get("is_active", True)),
         "createdAt": row.get("created_at").isoformat() if row.get("created_at") else None,
@@ -60,8 +64,8 @@ def create_user(first, paternal, maternal, full_name, email, password_hash):
     with db.cursor(commit=True) as cur:
         cur.execute(
             f"INSERT INTO users (first_name, last_name_paternal, last_name_maternal, "
-            "full_name, email, password_hash, role, is_active) "
-            "VALUES (%s, %s, %s, %s, %s, %s, 'user', TRUE) "
+            "full_name, email, password_hash, role, role_id, is_active) "
+            "VALUES (%s, %s, %s, %s, %s, %s, 'user', 2, TRUE) "
             f"RETURNING {PUBLIC_COLUMNS}",
             (first, paternal, maternal or None, full_name, email, password_hash))
         return cur.fetchone()

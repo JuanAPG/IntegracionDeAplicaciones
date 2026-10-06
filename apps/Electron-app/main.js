@@ -65,17 +65,38 @@ function createWindow() {
 
 /* ------------------------------------------------------------------ */
 /* Cliente HTTP (XML)                                                  */
+/*                                                                     */
+/* El renderer sigue sin hacer peticiones por su cuenta: todas pasan    */
+/* por aqui. Lo que cambia con la entrega de Redis es que ahora hay     */
+/* peticiones AUTENTICADAS y con cuerpo (login, pedidos, pagos), no     */
+/* solo GET del catalogo. Se mantiene el principio original: el         */
+/* microservicio responde XML y el renderer lo interpreta con           */
+/* DOMParser; en ningun punto se pide ni se interpreta JSON.            */
+/*                                                                     */
+/* EXCEPCION DELIBERADA: POST /login y POST /refresh se piden en JSON.  */
+/* El servicio NO publica el token ni el refreshToken en su XML (los    */
+/* XML acaban en archivos y registros intermedios con demasiada         */
+/* facilidad), de modo que pedirlos en XML devolveria una respuesta sin */
+/* credenciales. Es el unico punto donde se habla JSON, y se anota      */
+/* aqui para que no parezca un descuido.                                */
 /* ------------------------------------------------------------------ */
 
+/** Encabezado Authorization, solo si viene un token. */
+function authHeader(token) {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 /**
- * Descarga un documento XML y lo devuelve como texto.
- * Nunca lanza: siempre resuelve con un sobre {ok, ...} que el renderer
- * traduce a un mensaje de interfaz.
+ * Peticion generica. Nunca lanza: siempre resuelve con un sobre
+ * {ok, status, body, ...} que el renderer traduce a interfaz.
+ *
+ * options = { url, method, token, body, accept }
  */
-async function fetchXml(_event, requestUrl) {
+async function apiRequest(_event, options) {
+  const opts = options && typeof options === 'object' ? options : {};
   let parsed;
   try {
-    parsed = new URL(String(requestUrl));
+    parsed = new URL(String(opts.url));
   } catch {
     return { ok: false, kind: 'url', message: 'La URL configurada no es valida.' };
   }
@@ -84,16 +105,27 @@ async function fetchXml(_event, requestUrl) {
     return { ok: false, kind: 'url', message: 'Solo se admiten los protocolos http y https.' };
   }
 
+  const method = String(opts.method || 'GET').toUpperCase();
+  const accept = opts.accept === 'json'
+    ? 'application/json'
+    : 'application/xml, text/xml';
+
+  const headers = { Accept: accept, ...authHeader(opts.token) };
+  let payload;
+  if (opts.body !== undefined && opts.body !== null) {
+    headers['Content-Type'] = 'application/json';
+    payload = JSON.stringify(opts.body);
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const startedAt = Date.now();
 
   try {
     const response = await fetch(parsed.toString(), {
-      method: 'GET',
-      // Se solicita XML de forma explicita: el microservicio responde
-      // XML por omision y este encabezado lo deja por escrito.
-      headers: { Accept: 'application/xml, text/xml' },
+      method,
+      headers,
+      body: payload,
       redirect: 'follow',
       signal: controller.signal,
     });
@@ -106,6 +138,9 @@ async function fetchXml(_event, requestUrl) {
       statusText: response.statusText,
       contentType: response.headers.get('content-type') || '',
       totalCount: response.headers.get('x-total-count'),
+      // X-Cache dice si el catalogo vino de Redis (HIT) o de PostgreSQL
+      // (MISS): se expone para poder enseñarlo en la interfaz.
+      cache: response.headers.get('x-cache'),
       elapsedMs: Date.now() - startedAt,
       url: parsed.toString(),
       body,
@@ -130,12 +165,18 @@ async function fetchXml(_event, requestUrl) {
   }
 }
 
+/** Compatibilidad: el catalogo sigue llamando a fetchXml(url). */
+async function fetchXml(_event, requestUrl) {
+  return apiRequest(_event, { url: requestUrl, method: 'GET' });
+}
+
 /* ------------------------------------------------------------------ */
 /* Ciclo de vida                                                       */
 /* ------------------------------------------------------------------ */
 
 app.whenReady().then(() => {
   ipcMain.handle('library:fetch-xml', fetchXml);
+  ipcMain.handle('library:api-request', apiRequest);
   ipcMain.handle('library:open-external', (_event, url) => {
     if (/^https?:\/\//i.test(String(url))) shell.openExternal(String(url));
   });

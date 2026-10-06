@@ -21,21 +21,28 @@ from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
+from . import _bootstrap  # noqa: F401  (deja library_common importable)
 from . import books_repository as repo
+from . import cache as book_cache
 from . import config
 from . import db
 from . import openapi
 from . import serializers
 from . import clasificacion_repository as clasif_repo
 from . import soap_endpoint
-from .auth import token_required
+from .auth import current_identity, permission_required, token_required  # noqa: F401
 from .errors import ApiError, ValidationError
 from .payloads import read_book_payload
+from .shared import store
+from library_common import logging_support, metrics
+from library_common.errors import ApiError as SharedApiError
+from library_common.errors import DependencyUnavailable
+from library_common.flask_support import metrics_payload
 
-logging.basicConfig(
-    level=logging.DEBUG if config.DEBUG else logging.INFO,
-    format="%(asctime)s %(levelname)-7s %(message)s")
-log = logging.getLogger("library.soap")
+# Filtro de secretos en el logger raiz: ni tokens, ni contrasenas, ni la
+# URL de Redis con su clave acaban en los registros.
+log = logging_support.configure(
+    logging.DEBUG if config.DEBUG else logging.INFO, service="books")
 
 app = Flask(__name__)
 # Mantiene el orden en que se construye el diccionario (id, isbn, title, ...)
@@ -58,6 +65,34 @@ CORS(
     supports_credentials=False,
     max_age=config.CORS_MAX_AGE,
 )
+
+
+if config.SHARED.cors_wildcard:
+    log.warning("CORS_ORIGINS='*' deja el catalogo abierto a cualquier origen: "
+                "en produccion enumere los origenes de los clientes en el .env")
+
+
+# ---------------------------------------------------------------------
+# Metricas por peticion (las publica GET /metrics)
+# ---------------------------------------------------------------------
+@app.before_request
+def _metrics_start():
+    import time
+    request.environ["library.started_at"] = time.perf_counter()
+
+
+@app.after_request
+def _metrics_end(response):
+    import time
+    started = request.environ.get("library.started_at")
+    if started is not None:
+        metrics.observe(f"http.{request.method.lower()}",
+                        (time.perf_counter() - started) * 1000.0)
+    metrics.incr("http.requests")
+    metrics.incr(f"http.status.{response.status_code // 100}xx")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
 
 
 # ---------------------------------------------------------------------
@@ -192,6 +227,20 @@ def _books_response(status=200, headers=None):
     return respond(payload, element, status=status, headers=all_headers)
 
 
+def _cached_books_response():
+    """
+    Listado con cache en Redis (clave books:list:<representacion>:<filtros>).
+
+    Si Redis acierta, PostgreSQL no se toca. Si Redis falla o no esta, se
+    consulta la base igual: el cache es opcional para las lecturas.
+    """
+    key = book_cache.list_key(wants_xml())
+    hit = book_cache.get(key)
+    if hit is not None:
+        return hit
+    return book_cache.put(key, _books_response(), config.CACHE_TTL)
+
+
 def _single_book_response(row, status=200, headers=None):
     return respond({"book": serializers.book_to_dict(row)},
                    serializers.book_element(row), status=status, headers=headers)
@@ -211,7 +260,9 @@ def index():
         "xmlNamespace": config.XML_NAMESPACE,
         "documentation": {"swaggerUi": "/docs", "openapi": "/openapi.json"},
         "endpoints": [
-            {"method": "GET", "path": "/health", "description": "Estado del servicio y de la base de datos"},
+            {"method": "GET", "path": "/health", "description": "Estado del servicio, de PostgreSQL y de Redis"},
+            {"method": "GET", "path": "/metrics", "description": "Contadores del proceso y cache de Redis"},
+            {"method": "POST", "path": f"{API}/cache/invalidate", "description": "Invalidar el cache del catalogo (requiere books:write)"},
             {"method": "GET", "path": "/docs", "description": "Documentacion interactiva (Swagger UI)"},
             {"method": "GET", "path": "/openapi.json", "description": "Especificacion OpenAPI 3.0.3"},
             {"method": "GET", "path": f"{API}/books", "description": "Todos los libros (admite filtros, orden y paginacion)"},
@@ -240,23 +291,59 @@ def index():
 
 @app.get("/health")
 def health():
-    warnings = []
-    if not config.jwt_configured():
-        warnings.append("JWT_SECRET sin fijar: la validacion Bearer no es segura.")
+    """
+    Estado del servicio y de sus dependencias.
+
+    PostgreSQL caido es un 503: sin base no hay catalogo.
+    Redis caido es DEGRADADO, no caido: las lecturas siguen funcionando
+    (solo pierden el cache), pero las escrituras devolveran 503 porque
+    no se puede comprobar la revocacion de tokens. El semaforo de las
+    aplicaciones de escritorio lo pinta en amarillo.
+    """
+    warnings = config.warnings()
+    redis_block = store.health()
+    redis_ok = redis_block.get("status") == "ok"
+    if not redis_ok and config.redis_configured():
+        warnings.append("Redis no responde: las lecturas siguen (sin cache), "
+                        "pero las escrituras devolveran 503 porque no se puede "
+                        "comprobar la revocacion de tokens.")
     try:
         info = db.ping()
-        payload = {"status": "ok", "database": info["db"], "user": info["usr"],
+        payload = {"status": "ok" if redis_ok else "degraded",
+                   "database": info["db"], "user": info["usr"],
                    "schema": config.PGSCHEMA,
                    "server": info["version"].split(" on ")[0],
-                   "jwt": "ok" if config.jwt_configured() else "missing_secret"}
+                   "jwt": "ok" if config.jwt_configured() else "missing_secret",
+                   "redis": redis_block,
+                   "cache": {"enabled": book_cache.enabled(),
+                             "listTtl": config.CACHE_TTL,
+                             "detailTtl": config.CACHE_DETAIL_TTL}}
+        # 200 aunque Redis este caido: el catalogo se puede leer igual.
         status = 200
     except Exception as exc:                       # noqa: BLE001 - se reporta al cliente
         payload = {"status": "error", "database": config.PGDATABASE,
-                   "message": str(exc).strip()}
+                   "message": str(exc).strip(), "redis": redis_block}
         status = 503
     if warnings:
         payload["warnings"] = warnings
     return respond(payload, serializers.dict_element("health", payload), status=status)
+
+
+@app.get("/metrics")
+def service_metrics():
+    """
+    Contadores del proceso y estado del servidor Redis.
+
+    Lo util aqui es la pareja redis.cache.hit / redis.cache.miss: dice si
+    el cache esta sirviendo de algo. redis.cache.degraded cuenta las
+    veces que Redis fallo y la peticion siguio contra PostgreSQL.
+    """
+    payload = metrics_payload("library-books-service", store, {
+        "cache": {"enabled": book_cache.enabled(),
+                  "listTtl": config.CACHE_TTL,
+                  "detailTtl": config.CACHE_DETAIL_TTL},
+    })
+    return respond(payload, serializers.dict_element("metrics", payload))
 
 
 # =====================================================================
@@ -264,62 +351,118 @@ def health():
 # =====================================================================
 @app.get(f"{API}/books")
 def list_books():
-    """Todos los libros. Los mismos filtros que /books/search."""
-    return _books_response()
+    """
+    Todos los libros. Los mismos filtros que /books/search.
+
+    Lectura PUBLICA (no exige token) y CACHEADA en Redis con TTL corto.
+    La cabecera X-Cache dice si la respuesta vino de Redis (HIT) o de
+    PostgreSQL (MISS).
+    """
+    return _cached_books_response()
 
 
 @app.get(f"{API}/books/search")
 def search_books():
     """Busqueda por atributos: titulo, autor, genero, concepto, precio, etc."""
-    return _books_response()
+    return _cached_books_response()
 
 
 @app.get(f"{API}/books/<int:book_id>")
 def get_book(book_id):
     """Un libro por su id, con autores, generos, conceptos e imagenes."""
-    return _single_book_response(repo.get_book(book_id))
+    key = book_cache.id_key(book_id, wants_xml())
+    hit = book_cache.get(key)
+    if hit is not None:
+        return hit
+    return book_cache.put(key, _single_book_response(repo.get_book(book_id)),
+                          config.CACHE_DETAIL_TTL)
 
 
 @app.get(f"{API}/books/isbn/<path:isbn>")
 def get_book_by_isbn(isbn):
-    """Un libro por su ISBN (dependencia funcional ISBN -> libro)."""
-    return _single_book_response(repo.get_book_by_isbn(isbn.strip()))
+    """
+    Un libro por su ISBN (dependencia funcional ISBN -> libro).
+
+    Cacheado con la clave books:<isbn> que pide el enunciado.
+    """
+    isbn = isbn.strip()
+    key = book_cache.isbn_key(isbn, wants_xml())
+    hit = book_cache.get(key)
+    if hit is not None:
+        return hit
+    return book_cache.put(key, _single_book_response(repo.get_book_by_isbn(isbn)),
+                          config.CACHE_DETAIL_TTL)
 
 
+# =====================================================================
+# Escrituras
+#
+# Todas exigen Authorization: Bearer <JWT> Y el permiso "books:write"
+# del rol (admin y staff lo tienen; un cliente, no):
+#     401  token ausente, invalido, caducado o revocado
+#     403  token valido pero el rol no tiene books:write
+#     503  Redis caido y no se puede comprobar la revocacion
+#
+# Y todas INVALIDAN el cache del catalogo al terminar, antes de
+# responder: la siguiente lectura no puede ver datos viejos.
+# =====================================================================
 @app.post(f"{API}/books")
-@token_required
+@permission_required("books:write")
 def create_book():
-    """Alta de un libro. Acepta el cuerpo en JSON o en XML. Requiere token JWT."""
+    """Alta de un libro. Acepta el cuerpo en JSON o en XML. Requiere JWT."""
     data = read_book_payload(request, partial=False)
     row = repo.create_book(data)
+    book_cache.invalidate(f"POST /books id={row['id']}")
     return _single_book_response(row, status=201,
                                  headers={"Location": f"{API}/books/{row['id']}"})
 
 
 @app.put(f"{API}/books/<int:book_id>")
-@token_required
+@permission_required("books:write")
 def replace_book(book_id):
-    """Modificar un libro: el cuerpo describe el libro completo. Requiere token JWT."""
+    """Modificar un libro: el cuerpo describe el libro completo. Requiere JWT."""
     data = read_book_payload(request, partial=False)
-    return _single_book_response(repo.update_book(book_id, data, replace=True))
+    row = repo.update_book(book_id, data, replace=True)
+    book_cache.invalidate(f"PUT /books/{book_id}")
+    return _single_book_response(row)
 
 
 @app.patch(f"{API}/books/<int:book_id>")
-@token_required
+@permission_required("books:write")
 def update_book(book_id):
-    """Actualizar un libro: solo cambian los campos enviados. Requiere token JWT."""
+    """Actualizar un libro: solo cambian los campos enviados. Requiere JWT."""
     data = read_book_payload(request, partial=True)
-    return _single_book_response(repo.update_book(book_id, data, replace=False))
+    row = repo.update_book(book_id, data, replace=False)
+    book_cache.invalidate(f"PATCH /books/{book_id}")
+    return _single_book_response(row)
 
 
 @app.delete(f"{API}/books/<int:book_id>")
-@token_required
+@permission_required("books:write")
 def delete_book(book_id):
-    """Borrar un libro (las tablas hijas caen por ON DELETE CASCADE). Requiere token JWT."""
+    """Borrar un libro (las tablas hijas caen por ON DELETE CASCADE). Requiere JWT."""
     deleted = repo.delete_book(book_id)
+    book_cache.invalidate(f"DELETE /books/{book_id}")
     payload = {"deleted": True, "id": deleted["id"], "isbn": deleted["isbn"],
                "title": deleted["title"]}
     return respond(payload, serializers.dict_element("deleted", payload))
+
+
+@app.post(f"{API}/cache/invalidate")
+@permission_required("books:write")
+def invalidate_cache():
+    """
+    Invalida a mano el cache del catalogo.
+
+    Existe por dos motivos concretos: para que PEDIDOS y PAGOS puedan
+    avisar cuando mueven books.stock (lo hacen por SQL, en su propia
+    transaccion, y el catalogo cacheado se quedaria con el stock viejo),
+    y para poder vaciarlo durante una demostracion sin reiniciar nada.
+    """
+    removed = book_cache.invalidate("POST /cache/invalidate")
+    payload = {"invalidated": True, "keysRemoved": removed,
+               "cacheEnabled": book_cache.enabled()}
+    return respond(payload, serializers.dict_element("cache", payload))
 
 
 # =====================================================================
@@ -428,6 +571,29 @@ def handle_api_error(exc):
     return _error_response(exc.status, exc.code, exc.message, exc.details)
 
 
+@app.errorhandler(SharedApiError)
+def handle_shared_api_error(exc):
+    """
+    Errores del paquete compartido: 401 de token ausente, invalido,
+    caducado o revocado; 403 de rol sin permiso. Misma forma de respuesta
+    (XML o JSON) que el resto del servicio.
+    """
+    if exc.status >= 500:
+        log.error("%s: %s", exc.code, exc.message)
+    return _error_response(exc.status, exc.code, exc.message, exc.details)
+
+
+@app.errorhandler(DependencyUnavailable)
+def handle_dependency_down(exc):
+    """
+    Redis caido durante la comprobacion de revocacion de un token. Es un
+    fallo SEGURO: antes que aceptar una credencial que quiza fue
+    retirada, se responde 503. Las LECTURAS no pasan por aqui.
+    """
+    log.error("Dependencia no disponible (%s): %s", exc.code, exc.message)
+    return _error_response(exc.status, exc.code, exc.message, exc.details)
+
+
 @app.errorhandler(db.DatabaseUnavailable)
 def handle_db_down(exc):
     log.error("PostgreSQL no disponible: %s", exc)
@@ -460,5 +626,11 @@ if __name__ == "__main__":
     log.info("Swagger UI -> http://%s:%s/docs", config.HOST, config.PORT)
     log.info("PostgreSQL -> %s@%s:%s/%s (esquema %s)",
              config.PGUSER, config.PGHOST, config.PGPORT, config.PGDATABASE, config.PGSCHEMA)
+    from library_common.env import redacted
+    log.info("Redis -> %s (cache %ss listados / %ss fichas)",
+             redacted(config.REDIS_URL) or "SIN CONFIGURAR",
+             config.CACHE_TTL, config.CACHE_DETAIL_TTL)
     log.info("CORS origins -> %s", ", ".join(config.CORS_ORIGINS))
+    for item in config.warnings():
+        log.warning(item)
     app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)

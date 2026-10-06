@@ -1,0 +1,25 @@
+# Microservicio de pagos y su efecto en el estado de los pedidos
+# (Flask + Psycopg 3 + PostgreSQL + Redis)
+#
+#   python3 -m venv .venv
+#   source .venv/bin/activate
+#   pip install -r requirements.txt
+#   pip install -e ../../../packages/library_common
+#
+# El paquete compartido library_common trae Flask, PyJWT, redis y
+# python-dotenv; aqui solo se declara lo propio del servicio. Se instala
+# aparte porque vive en el repo y no en PyPI (ver README).
+Flask>=3.0,<4
+Flask-Cors>=4.0,<7
+psycopg[binary,pool]>=3.1,<4
+python-dotenv>=1.0,<2
+gunicorn>=21.2
+
+# Documentacion: /openapi.json y Swagger UI en /docs (sin Internet).
+flasgger>=0.9.7
+
+# JWT: verificacion de tokens (el emisor es el microservicio login).
+PyJWT>=2.8,<3
+
+# Redis: sesiones, revocacion de JWT, cache y cerrojos.
+redis>=5.0,<7

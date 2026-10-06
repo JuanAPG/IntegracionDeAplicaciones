@@ -1,13 +1,25 @@
 """Cliente del microservicio login. Siempre pide JSON (?format=json).
 
-Guarda el token JWT (Bearer, 1 h) junto a la cookie de sesion Flask:
-las escrituras en el microservicio de libros exigen
-`Authorization: Bearer <token>` (401 sin el, 403 si es invalido/expiro).
+QUE CAMBIO CON REDIS
+  * El token de acceso dura 30 MINUTOS (antes 1 h) y ya no se espera a
+    que caduque: POST /refresh lo renueva antes, canjeando un refresh
+    token que vive 8 h en Redis y es de UN SOLO USO (al canjearlo se
+    entrega otro).
+  * /logout ya no solo borra la cookie: REVOCA el token en Redis, de
+    modo que deja de servir en los seis microservicios en el acto.
+  * La sesion vive en Redis y la cookie solo lleva su identificador, de
+    modo que una sesion se puede cerrar desde el servidor.
+
+El token y el refresh se guardan en un TokenBox compartido con los demas
+clientes (ver api_client.py), para que renovar en un sitio valga para
+todos.
 """
-import base64
 import json
+import secrets
 
 import requests
+
+from api_client import TokenBox, decode_claims
 
 
 def _err(resp, fallback):
@@ -27,34 +39,94 @@ def _err(resp, fallback):
 
 
 class LoginClient:
-    def __init__(self, base_url, timeout=8):
+    def __init__(self, base_url, timeout=8, tokens=None):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.session = requests.Session()
         self.session.headers.update({"Accept": "application/json"})
-        self._token = None
+        # TokenBox compartido: si lo renueva este cliente, los de libros,
+        # pedidos y pagos usan el token nuevo sin enterarse.
+        self.tokens = tokens if tokens is not None else TokenBox()
 
+    # -- compatibilidad con el codigo que ya usaba .token/.set_token ----
     @property
     def token(self):
         """El JWT Bearer actual, o None si no hay login vigente."""
-        return self._token
+        return self.tokens.access
 
-    def set_token(self, token):
-        self._token = token or None
+    def set_token(self, token, refresh=None, renew_before=None):
+        self.tokens.set(token, refresh, renew_before)
+
+    @property
+    def refresh_token(self):
+        return self.tokens.refresh
 
     def token_expired(self):
-        """True si el JWT ya expiro (claim exp vs hora local, sin verificar
-        firma: la verificacion la hace el servidor)."""
-        if not self._token:
+        """True si el JWT ya caduco (claim exp contra la hora local; la
+        verificacion de verdad la hace el servidor)."""
+        if not self.tokens.access:
             return True
-        try:
-            import time
-            payload = self._token.split(".")[1]
-            payload += "=" * (-len(payload) % 4)
-            exp = json.loads(base64.urlsafe_b64decode(payload)).get("exp")
-            return exp is not None and exp <= int(time.time())
-        except Exception:
+        return self.tokens.expired()
+
+    def token_expiring_soon(self):
+        """True si conviene renovar ya (quedan menos de renewBefore)."""
+        return bool(self.tokens.access) and self.tokens.expiring_soon()
+
+    def seconds_left(self):
+        return self.tokens.seconds_left()
+
+    @property
+    def role(self):
+        return self.tokens.role
+
+    @property
+    def user_id(self):
+        return self.tokens.user_id
+
+    def claims(self):
+        return decode_claims(self.tokens.access)
+
+    # -----------------------------------------------------------------
+    def refresh(self):
+        """
+        Canjea el refresh token por un par nuevo (POST /refresh).
+
+        Devuelve True si lo consiguio. Si falla, se limpia la sesion: el
+        refresh es de un solo uso y, si el servidor lo rechaza, no hay
+        nada que reintentar — hay que volver a iniciar sesion.
+        """
+        if not self.tokens.refresh:
             return False
+        try:
+            r = self.session.post(f"{self.base_url}/refresh",
+                                  params={"format": "json"},
+                                  json={"refreshToken": self.tokens.refresh},
+                                  timeout=self.timeout)
+        except requests.RequestException:
+            # Sin red no se puede renovar, pero el token actual puede
+            # seguir sirviendo: no se borra la sesion por un corte.
+            return False
+        if r.status_code != 200:
+            self.tokens.clear()
+            return False
+        try:
+            data = r.json()
+        except ValueError:
+            return False
+        self.tokens.set(data.get("token"), data.get("refreshToken"),
+                        data.get("renewBefore"))
+        return bool(self.tokens.access)
+
+    def ensure_fresh(self):
+        """Renueva si al token le queda poco. Lo llaman los demas clientes."""
+        if self.tokens.access and self.tokens.expiring_soon():
+            return self.refresh()
+        return bool(self.tokens.access)
+
+    @staticmethod
+    def new_idempotency_key():
+        """Clave para que un reintento de pago no cobre dos veces."""
+        return secrets.token_urlsafe(16)
 
     def restore_cookies(self, cookies):
         if cookies:
@@ -83,6 +155,8 @@ class LoginClient:
         if r.status_code == 200:
             return True, "up", data
         msg, _, _ = _err(r, "Login no disponible")
+        # El 503 de login con cuerpo suele ser "Redis caido": el
+        # servicio responde, pero no puede abrir ni cerrar sesiones.
         if r.status_code == 503 and isinstance(data, dict):
             # Accesible pero degradado (p. ej. sin PostgreSQL): el cuerpo trae
             # {"status": "error", ...} en vez de dejar data en None.
@@ -164,9 +238,11 @@ class LoginClient:
                 data = r.json()
             except Exception:
                 data = {}
-            self._token = data.get("token") or None
+            # Se guardan los DOS: el de acceso (30 min) y el refresh (8 h).
+            self.tokens.set(data.get("token"), data.get("refreshToken"),
+                            data.get("renewBefore"))
             return True, "Sesión iniciada.", data.get("user", {}), ""
-        self._token = None
+        self.tokens.clear()
         msg, status, code = _err(r, "No se pudo iniciar sesión")
         if status == 401:
             msg = "Usuario no encontrado o credenciales inválidas."
@@ -175,12 +251,25 @@ class LoginClient:
         return False, msg, None, code
 
     def logout(self):
+        """
+        Cierra la sesion en el servidor.
+
+        Se manda el Bearer ademas de la cookie: asi el servidor REVOCA el
+        jti en Redis y el token deja de servir en los seis
+        microservicios de inmediato, en vez de seguir siendo valido hasta
+        30 minutos despues. Si la llamada falla (sin red), se limpia
+        igualmente del lado del cliente.
+        """
+        headers = {}
+        if self.tokens.access:
+            headers["Authorization"] = f"Bearer {self.tokens.access}"
         try:
-            self.session.post(f"{self.base_url}/logout", params={"format": "json"},
+            self.session.post(f"{self.base_url}/logout",
+                              params={"format": "json"}, headers=headers,
                               timeout=self.timeout)
         except requests.RequestException:
             pass
-        self._token = None
+        self.tokens.clear()
         try:
             self.session.cookies.clear()
         except Exception:

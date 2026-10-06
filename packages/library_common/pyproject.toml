@@ -1,0 +1,34 @@
+# =====================================================================
+# packages/library_common/pyproject.toml
+#
+# Paquete compartido por los seis microservicios de la libreria. Vive en
+# el repo y se instala en modo editable dentro del venv de cada servicio:
+#
+#     pip install -e packages/library_common
+#
+# De esa forma un arreglo de seguridad (verificacion de JWT, revocacion,
+# manejo de Redis) se aplica UNA vez y lo heredan todos los servicios, en
+# lugar de copiarse seis veces.
+#
+# Las dependencias se declaran aqui (Flask, PyJWT, redis) para que
+# instalar el paquete arrastre lo que necesita; el requirements.txt de
+# cada servicio solo agrega lo propio (psycopg, bcrypt, flasgger...).
+# =====================================================================
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "library-common"
+version = "1.0.0"
+description = "Capa compartida de la libreria en linea: Redis, JWT, roles, negociacion XML/JSON y metricas"
+requires-python = ">=3.9"
+dependencies = [
+    "Flask>=3.0,<4",
+    "PyJWT>=2.8,<3",
+    "redis>=5.0,<7",
+    "python-dotenv>=1.0,<2",
+]
+
+[tool.setuptools]
+packages = ["library_common"]

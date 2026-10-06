@@ -822,3 +822,48 @@ p { margin: 0 0 var(--space-3); }
 @media (forced-colors: active) {
   .book-card, .toolbar, .dialog, .pagination { border: 1px solid CanvasText; }
 }
+
+
+/* =====================================================================
+   Paneles de sesion, pedidos y envios (js/panels.js)
+
+   Se apoyan en lo que ya existe (.dialog, .btn, .field, .input, .chips) y
+   solo anaden la tarjeta de pedido y su lista de lineas, que el catalogo
+   no necesitaba.
+   ===================================================================== */
+
+.panel-card {
+  border: 1px solid var(--line, rgba(255, 255, 255, .08));
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: var(--surface-2, rgba(255, 255, 255, .03));
+}
+
+.panel-card h3 {
+  margin: 0 0 2px;
+  font-size: 1rem;
+  letter-spacing: .01em;
+}
+
+.panel-card__meta {
+  margin: 0 0 10px;
+  font-size: .82rem;
+  color: var(--muted, #9AA4B2);
+}
+
+.panel-card .chips {
+  margin-bottom: 10px;
+}
+
+.panel-list {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  font-size: .88rem;
+  line-height: 1.55;
+  color: var(--text-2, #C7CEDB);
+}
+
+.panel-list li {
+  margin: 2px 0;
+}

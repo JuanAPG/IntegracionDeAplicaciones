@@ -1,0 +1,4 @@
+Flask<4,>=3.0
+PyJWT<3,>=2.8
+redis<7,>=5.0
+python-dotenv<2,>=1.0

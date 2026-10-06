@@ -194,38 +194,69 @@ class AuthDialog(tk.Toplevel):
 
 
 class SettingsDialog(tk.Toplevel):
-    """Modificar, probar, guardar, persistir y restaurar endpoints."""
+    """
+    Modificar, probar, guardar y restaurar los endpoints de los SEIS
+    microservicios.
 
-    def __init__(self, parent, config, on_save, login_factory, books_factory):
+    Como la IP de la VM es efímera y cambia a menudo, arriba hay un
+    atajo: escribir la IP una vez rellena los seis campos conservando
+    los puertos (5000..5005). Editar cada URL a mano sigue siendo
+    posible, para un despliegue repartido entre máquinas.
+    """
+
+    PUERTOS = (("login", "Login", 5000), ("books", "Libros", 5001),
+               ("users", "Usuarios", 5002), ("authors", "Autores", 5003),
+               ("pedidos", "Pedidos", 5004), ("pagos", "Pagos", 5005))
+
+    def __init__(self, parent, config, on_save, rebuild):
         import config_store
         self._store = config_store
         super().__init__(parent)
         self.config = config
         self.on_save = on_save
-        self.login_factory = login_factory
-        self.books_factory = books_factory
+        self.rebuild = rebuild
         self.title("Conexión con microservicios")
-        self.geometry("500x520")
-        self.resizable(False, False)
+        self.geometry("560x680")
+        self.resizable(False, True)
         self.transient(parent)
         self.grab_set()
         theme.apply(self)
+
         f = ttk.Frame(self, padding=18)
         f.pack(fill="both", expand=True)
         ttk.Label(f, text="Conexión", font=("Helvetica", 13, "bold")).pack(anchor="w")
-        ttk.Label(f, text="La base vive en la VM; aquí solo cambian las direcciones.",
+        ttk.Label(f, text="La base y Redis viven en la VM; aquí solo cambian "
+                          "las direcciones.",
                   style="Muted.TLabel").pack(anchor="w", pady=(0, 12))
-        ep = config.get("endpoints", {})
-        self.e_login = self._row(f, "Login (:5000)", ep.get("login_base_url", ""))
-        self.e_books = self._row(f, "Books (:5001)", ep.get("books_base_url", ""))
+
+        # Atajo: una IP para los seis.
+        atajo = ttk.Frame(f)
+        atajo.pack(fill="x", pady=(0, 10))
+        ttk.Label(atajo, text="IP de la VM").pack(side="left")
+        self.e_host = ttk.Entry(atajo, width=18)
+        self.e_host.pack(side="left", padx=(6, 6))
+        ttk.Button(atajo, text="Aplicar a los seis",
+                   command=self._aplicar_host).pack(side="left")
+
+        ep = config.get("endpoints", {}) or {}
+        urls = self._store.service_urls(config)
+        self.entries = {}
+        for clave, etiqueta, puerto in self.PUERTOS:
+            self.entries[clave] = self._row(f, f"{etiqueta} (:{puerto})",
+                                            urls.get(clave, ""))
         self.e_timeout = self._row(f, "Timeout segundos", str(ep.get("timeout", 8)))
-        self.e_poll = self._row(f, "Chequeo semáforo cada (seg)", str(ep.get("poll", 15)))
-        self.lbl_test = ttk.Label(f, text="Sin probar.", style="Muted.TLabel")
+        self.e_poll = self._row(f, "Chequeo semáforo cada (seg)",
+                                str(ep.get("poll", 15)))
+
+        self.lbl_test = ttk.Label(f, text="Sin probar.", style="Muted.TLabel",
+                                  wraplength=500, justify="left")
         self.lbl_test.pack(anchor="w", pady=(6, 0))
         btns = ttk.Frame(f)
         btns.pack(fill="x", pady=(10, 0))
-        ttk.Button(btns, text="Probar", command=self._test).pack(side="left", padx=(0, 6))
-        ttk.Button(btns, text="Restaurar valores", command=self._defaults).pack(side="left")
+        ttk.Button(btns, text="Probar los seis",
+                   command=self._test).pack(side="left", padx=(0, 6))
+        ttk.Button(btns, text="Restaurar valores",
+                   command=self._defaults).pack(side="left")
         ttk.Button(f, text="Guardar", style="Accent.TButton",
                    command=self._save).pack(fill="x", pady=(12, 0))
 
@@ -233,8 +264,22 @@ class SettingsDialog(tk.Toplevel):
         ttk.Label(parent, text=label).pack(anchor="w")
         e = ttk.Entry(parent)
         e.insert(0, value)
-        e.pack(fill="x", pady=(2, 8))
+        e.pack(fill="x", pady=(2, 6))
         return e
+
+    def _aplicar_host(self):
+        host = self.e_host.get().strip().rstrip("/")
+        if not host:
+            self.lbl_test.configure(text="Escribe la IP o el host de la VM.")
+            return
+        if "://" not in host:
+            host = "http://" + host
+        for clave, _etiqueta, puerto in self.PUERTOS:
+            entrada = self.entries[clave]
+            entrada.delete(0, "end")
+            entrada.insert(0, f"{host}:{puerto}")
+        self.lbl_test.configure(
+            text="Los seis campos apuntan a esa IP (sin guardar aún).")
 
     def _draft(self):
         try:
@@ -245,31 +290,49 @@ class SettingsDialog(tk.Toplevel):
             poll = max(int(self.e_poll.get().strip() or 15), 5)
         except ValueError:
             poll = 15
-        return {"login_base_url": self.e_login.get().strip().rstrip("/"),
-                "books_base_url": self.e_books.get().strip().rstrip("/"),
-                "timeout": timeout, "poll": poll}
+        draft = {"timeout": timeout, "poll": poll}
+        for clave, _etiqueta, _puerto in self.PUERTOS:
+            draft[f"{clave}_base_url"] = self.entries[clave].get().strip().rstrip("/")
+        return draft
 
     def _test(self):
+        """Consulta /health de los seis. Es público: funciona sin sesión."""
         draft = self._draft()
-        self.lbl_test.configure(text="Probando…")
+        self.lbl_test.configure(text="Probando los seis servicios…")
+
         def work():
-            lc = self.login_factory({"endpoints": draft, "session": {}})
-            bc = self.books_factory({"endpoints": draft, "session": {}})
-            lok, lmsg, _ = lc.health()
-            bok, bmsg, _ = bc.health()
+            backend = self.rebuild({"endpoints": draft, "session": {}})
+            resultados = []
+            for clave, etiqueta, _puerto in self.PUERTOS:
+                cliente = backend.health_clients().get(clave)
+                if cliente is None:
+                    continue
+                ok, msg, data = cliente.health()
+                if ok and isinstance(data, dict) and (
+                        data.get("warnings")
+                        or (data.get("redis") or {}).get("status") not in
+                        (None, "ok")):
+                    resultados.append(f"{etiqueta}: degradado")
+                elif ok:
+                    resultados.append(f"{etiqueta}: up")
+                else:
+                    resultados.append(f"{etiqueta}: FALLA — {msg[:50]}")
+
             def done():
-                self.lbl_test.configure(
-                    text=f"Login: {'up' if lok else 'FALLA — ' + lmsg[:80]}   ·   "
-                         f"Books: {'up' if bok else 'FALLA — ' + bmsg[:80]}")
+                self.lbl_test.configure(text="   ·   ".join(resultados))
             self.after(0, done)
+
         _run(work)
 
     def _defaults(self):
         d = self._store.DEFAULTS["endpoints"]
-        for entry, key in ((self.e_login, "login_base_url"), (self.e_books, "books_base_url"),
-                           (self.e_timeout, "timeout"), (self.e_poll, "poll")):
-            entry.delete(0, "end")
-            entry.insert(0, str(d[key]))
+        for clave, _etiqueta, _puerto in self.PUERTOS:
+            entrada = self.entries[clave]
+            entrada.delete(0, "end")
+            entrada.insert(0, str(d[f"{clave}_base_url"]))
+        for entrada, clave in ((self.e_timeout, "timeout"), (self.e_poll, "poll")):
+            entrada.delete(0, "end")
+            entrada.insert(0, str(d[clave]))
         self.lbl_test.configure(text="Valores predeterminados (sin guardar aún).")
 
     def _save(self):

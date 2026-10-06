@@ -11,10 +11,25 @@
 const LibraryConfig = (() => {
   const STORAGE_KEY = 'library.desktop.serviceConfig';
 
+  // El catalogo (baseUrl + endpoint) se conserva tal cual para no
+  // romper la configuracion ya guardada en localStorage. Los cinco
+  // servicios restantes se derivan de la misma IP cambiando el puerto,
+  // y se pueden sobreescribir uno a uno.
   const DEFAULTS = Object.freeze({
-    baseUrl: 'http://34.51.18.197:5001',
+    baseUrl: 'http://34.51.14.158:5001',
     endpoint: '/books',
     pageSize: 6,
+    loginUrl: '',
+    usersUrl: '',
+    authorsUrl: '',
+    pedidosUrl: '',
+    pagosUrl: '',
+  });
+
+  // puerto de cada microservicio
+  const PUERTOS = Object.freeze({
+    login: 5000, books: 5001, users: 5002,
+    authors: 5003, pedidos: 5004, pagos: 5005,
   });
 
   const PAGE_SIZES = [3, 6, 9, 12, 24];
@@ -36,7 +51,47 @@ const LibraryConfig = (() => {
     if (!Number.isFinite(pageSize) || pageSize < 1) pageSize = DEFAULTS.pageSize;
     if (pageSize > 100) pageSize = 100;
 
-    return { baseUrl, endpoint, pageSize };
+    const extra = {};
+    for (const nombre of ['login', 'users', 'authors', 'pedidos', 'pagos']) {
+      const clave = `${nombre}Url`;
+      let valor = String(source[clave] ?? '').trim().replace(/\/+$/, '');
+      if (valor && !/^https?:\/\//i.test(valor)) valor = '';
+      extra[clave] = valor;
+    }
+
+    return { baseUrl, endpoint, pageSize, ...extra };
+  }
+
+  /**
+   * URL base de un microservicio.
+   *
+   * Si no se configuro explicitamente, se deriva del host del catalogo
+   * cambiando el puerto: los seis suelen vivir en la misma VM y asi
+   * basta con configurar uno.
+   */
+  function serviceUrl(config, nombre) {
+    const normalizado = normalize(config);
+    const explicito = normalizado[`${nombre}Url`];
+    if (explicito) return explicito;
+    if (nombre === 'books') return normalizado.baseUrl;
+    const puerto = PUERTOS[nombre];
+    if (!puerto) return normalizado.baseUrl;
+    try {
+      const url = new URL(normalizado.baseUrl);
+      url.port = String(puerto);
+      return url.origin;
+    } catch {
+      return normalizado.baseUrl;
+    }
+  }
+
+  /** Las seis URL base, resueltas. */
+  function serviceUrls(config) {
+    const salida = {};
+    for (const nombre of Object.keys(PUERTOS)) {
+      salida[nombre] = serviceUrl(config, nombre);
+    }
+    return salida;
   }
 
   /** Lee la configuracion vigente; ante cualquier dano devuelve la de fabrica. */
@@ -82,5 +137,6 @@ const LibraryConfig = (() => {
     return url.toString();
   }
 
-  return { DEFAULTS, PAGE_SIZES, STORAGE_KEY, load, save, reset, normalize, buildUrl };
+  return { DEFAULTS, PAGE_SIZES, PUERTOS, STORAGE_KEY, load, save, reset,
+           normalize, buildUrl, serviceUrl, serviceUrls };
 })();

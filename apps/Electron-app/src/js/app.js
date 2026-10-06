@@ -31,6 +31,9 @@
     btnNext:       document.getElementById('btn-next'),
     btnRefresh:    document.getElementById('btn-refresh'),
     btnSettings:   document.getElementById('btn-settings'),
+    btnSession:    document.getElementById('btn-session'),
+    btnOrders:     document.getElementById('btn-orders'),
+    btnTracking:   document.getElementById('btn-tracking'),
 
     bookDialog:      document.getElementById('book-dialog'),
     bookDialogTitle: document.getElementById('book-dialog-title'),
@@ -258,8 +261,62 @@
     dom.bookDialogTitle.textContent = book.title;
     dom.bookDialogEyebrow.textContent = LibraryUI.authorNames(book);
     LibraryUI.renderBookDetail(dom.bookDialogBody, book);
+
+    // Boton «Pedir»: solo si queda stock. Si no hay sesion, el panel
+    // abre el login antes de pedir nada, en vez de fallar con un 401.
+    const pie = LibraryUI.el('div', { class: 'chips' });
+    if ((book.stock ?? 0) > 0) {
+      const pedir = LibraryUI.el('button', {
+        type: 'button', class: 'btn btn--primary', text: 'Pedir este libro',
+      });
+      pedir.addEventListener('click', () => {
+        dom.bookDialog.close();
+        LibraryPanels.openOrderForBook(book);
+      });
+      pie.appendChild(pedir);
+    } else {
+      pie.appendChild(LibraryUI.el('span', {
+        class: 'chip', text: 'Sin existencias ahora mismo',
+      }));
+    }
+    dom.bookDialogBody.appendChild(pie);
+
     dom.bookDialog.showModal();   // el navegador atrapa el foco y gestiona Esc
     dom.bookDialogBody.scrollTop = 0;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Sesion                                                             */
+  /*                                                                     */
+  /* El boton hace las dos cosas segun el estado: entrar o salir. Al     */
+  /* salir, el servidor REVOCA el token en Redis, de modo que deja de    */
+  /* servir en los seis microservicios en el acto.                       */
+  /* ------------------------------------------------------------------ */
+
+  function renderSession(snapshot) {
+    if (!dom.btnSession) return;
+    if (snapshot.authenticated) {
+      const quien = (snapshot.user && snapshot.user.email) || 'sesion abierta';
+      dom.btnSession.textContent = `Salir (${quien})`;
+      dom.btnSession.title = `Rol ${snapshot.role || '—'}. `
+        + `El token se renueva solo cada 30 minutos.`;
+      if (dom.btnOrders) dom.btnOrders.hidden = false;
+    } else {
+      dom.btnSession.textContent = 'Iniciar sesion';
+      dom.btnSession.title = 'Necesario para hacer pedidos y pagos';
+      if (dom.btnOrders) dom.btnOrders.hidden = true;
+    }
+  }
+
+  async function toggleSession() {
+    if (LibraryAuth.isAuthenticated()) {
+      dom.btnSession.disabled = true;
+      await LibraryPanels.doLogout();
+      dom.btnSession.disabled = false;
+      setStatus('ok', 'Sesion cerrada y token revocado');
+      return;
+    }
+    LibraryPanels.openLogin();
   }
 
   /* ------------------------------------------------------------------ */
@@ -424,6 +481,22 @@
     syncPageSizeOptions();
     showOrigin();
     bindEvents();
+
+    // Paneles de sesion, pedidos y envios. Se les pasa un lector de la
+    // configuracion (no una copia) para que sigan la IP vigente si se
+    // cambia en Configuracion, y un aviso para recargar el catalogo
+    // cuando un pedido mueva el stock.
+    LibraryPanels.init({
+      config: () => state.config,
+      onPlaced: () => loadPage(state.page),
+    });
+
+    if (dom.btnSession) dom.btnSession.addEventListener('click', toggleSession);
+    if (dom.btnOrders) dom.btnOrders.addEventListener('click', () => LibraryPanels.openOrders());
+    if (dom.btnTracking) dom.btnTracking.addEventListener('click', () => LibraryPanels.openTracking());
+    LibraryAuth.onChange(renderSession);
+    renderSession(LibraryAuth.snapshot());
+
     loadPage(0);
   }
 

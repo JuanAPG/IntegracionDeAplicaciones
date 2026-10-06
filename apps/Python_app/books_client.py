@@ -1,5 +1,18 @@
-"""Cliente del microservicio de libros. Siempre pide JSON (?output=json)."""
+"""Cliente del microservicio de libros. Siempre pide JSON (?output=json).
+
+Ojo con el parámetro: en ESTE servicio `?format=` es un filtro de
+búsqueda (formato Físico/Digital/Audiolibro), de modo que la
+representación se pide con `?output=json`. En los demás servicios el
+parámetro es `?format=`.
+
+Desde la entrega de Redis el cliente hereda de ApiClient, con lo que
+comparte el token con los demás servicios, lo RENUEVA solo antes de que
+caduque (30 min) y reintenta una vez si una escritura devuelve 401.
+Las lecturas siguen siendo públicas: no mandan token.
+"""
 import requests
+
+from api_client import ApiClient
 
 
 def _err(resp, fallback):
@@ -16,37 +29,39 @@ def _err(resp, fallback):
     return f"{fallback} (HTTP {resp.status_code})."
 
 
-class BooksClient:
-    def __init__(self, base_url, timeout=8):
-        self.base_url = base_url.rstrip("/")
-        self.timeout = timeout
-        self.session = requests.Session()
-        self.session.headers.update({"Accept": "application/json"})
-        self._token = None
+class BooksClient(ApiClient):
+    """
+    Mantiene la forma (ok, mensaje, datos) que ya usaba la interfaz, en
+    lugar de la (ok, datos, error) de ApiClient: así ui_books.py no
+    cambia. La diferencia está en lo de abajo — token compartido,
+    renovación y reintento.
+    """
+
+    SERVICE = "Libros"
+
+    def __init__(self, base_url, timeout=8, tokens=None, refresher=None):
+        if tokens is None:
+            from api_client import TokenBox
+            tokens = TokenBox()
+        super().__init__(base_url, tokens, timeout=timeout,
+                         refresher=refresher, format_param="output")
 
     def set_token(self, token):
-        """Fija el JWT Bearer para las escrituras (POST/PUT/PATCH/DELETE).
-        Las lecturas son publicas y no lo necesitan."""
-        self._token = token or None
+        """Compatibilidad: fija solo el token de acceso en el TokenBox
+        compartido. El refresh lo administra LoginClient."""
+        self.tokens.access = token or None
 
-    def _auth_headers(self):
-        if self._token:
-            return {"Authorization": f"Bearer {self._token}"}
-        return {}
+    def _adapt(self, resultado, fallback="No se pudieron obtener libros"):
+        """(ok, datos, error) de ApiClient -> (ok, mensaje, datos)."""
+        ok, data, error = resultado
+        if ok:
+            return True, "", data
+        return False, (error.message if error else fallback), None
 
     def _get(self, path, params=None):
-        p = dict(params or {})
-        p.setdefault("output", "json")
-        try:
-            r = self.session.get(f"{self.base_url}{path}", params=p, timeout=self.timeout)
-        except requests.RequestException as exc:
-            return False, f"Sin conexión: {exc}", None
-        if r.status_code == 200:
-            try:
-                return True, "", r.json()
-            except Exception:
-                return False, "Respuesta no válida del servicio.", None
-        return False, _err(r, "No se pudieron obtener libros"), None
+        # Las lecturas del catálogo son públicas: sin token.
+        return self._adapt(self.request("GET", path, params=params, auth=False,
+                                        fallback="No se pudieron obtener libros"))
 
     def health(self):
         try:
@@ -59,6 +74,9 @@ class BooksClient:
         except Exception:
             data = {}
         if r.status_code == 200:
+            # Con Redis caído, books responde 200 con status "degraded":
+            # el catálogo se lee, pero las escrituras darán 503. El
+            # semáforo lo pinta en amarillo (ver health_monitor).
             return True, "up", data
         msg = _err(r, "Books no disponible")
         if r.status_code == 503 and isinstance(data, dict):
@@ -120,27 +138,25 @@ class BooksClient:
         return True, "", data if isinstance(data, list) else []
 
     def _write(self, method, path, payload):
-        try:
-            r = self.session.request(method, f"{self.base_url}{path}",
-                                     params={"output": "json"}, json=payload,
-                                     headers=self._auth_headers(),
-                                     timeout=self.timeout)
-        except requests.RequestException as exc:
-            return False, f"Servicio no disponible — sin conexión con {self.base_url}: {exc}", None
-        if r.status_code in (200, 201):
-            try:
-                return True, "", r.json()
-            except Exception:
-                return True, "", {}
-        msg = _err(r, "Operación rechazada")
-        if r.status_code == 401:
-            msg = ("Falta el token de sesión — vuelve a iniciar sesión. " + msg)
-        elif r.status_code == 403:
-            msg = ("Sesión sin permiso o token expirado — vuelve a iniciar sesión. " + msg)
-        elif r.status_code == 409:
+        """
+        Escritura con token.
+
+        ApiClient ya renueva el token si le queda poco y reintenta una
+        vez ante un 401. Aquí solo se afinan los mensajes para los casos
+        típicos del catálogo.
+        """
+        ok, data, error = self.request(method, path, json_body=payload,
+                                       fallback="Operación rechazada")
+        if ok:
+            return True, "", data
+        msg = error.message
+        if error.status == 409:
             msg = f"ISBN duplicado — ya existe un libro con ese ISBN. {msg}"
-        elif r.status_code == 404:
+        elif error.status == 404:
             msg = f"Libro inexistente — no hay libro con ese id/ISBN. {msg}"
+        elif error.status == 403:
+            msg = ("Tu rol no puede modificar el catálogo (hace falta "
+                   f"books:write). {msg}")
         return False, msg, None
 
     def create(self, payload):
@@ -155,21 +171,26 @@ class BooksClient:
         return self._write("PATCH", f"/books/{book_id}", payload)
 
     def delete(self, book_id):
-        try:
-            r = self.session.delete(f"{self.base_url}/books/{book_id}",
-                                    params={"output": "json"},
-                                    headers=self._auth_headers(),
-                                    timeout=self.timeout)
-        except requests.RequestException as exc:
-            return False, f"Sin conexión: {exc}"
-        if r.status_code in (200, 204):
+        ok, _data, error = self.request("DELETE", f"/books/{book_id}",
+                                        fallback="No se pudo eliminar")
+        if ok:
             return True, "Libro eliminado."
-        msg = _err(r, "No se pudo eliminar")
-        if r.status_code == 401:
-            msg = "Falta el token de sesión — vuelve a iniciar sesión. " + msg
-        elif r.status_code == 403:
-            msg = "Sesión sin permiso o token expirado — vuelve a iniciar sesión. " + msg
+        msg = error.message
+        if error.status == 403:
+            msg = ("Tu rol no puede borrar libros (hace falta books:write). "
+                   + msg)
         return False, msg
+
+    def invalidate_cache(self):
+        """
+        Pide al servicio que vacíe su caché de Redis.
+
+        Útil tras un pedido (que mueve el stock) o para una demostración.
+        Exige books:write, de modo que un cliente normal recibirá 403.
+        """
+        ok, data, error = self.request("POST", "/cache/invalidate",
+                                       fallback="No se pudo invalidar la caché")
+        return (True, "", data) if ok else (False, error.message, None)
 
 
 # ---- helpers de presentación ----

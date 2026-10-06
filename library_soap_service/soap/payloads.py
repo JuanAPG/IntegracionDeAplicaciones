@@ -351,7 +351,8 @@ def validate(source, partial=False):
         isbn = _text(source["isbn"], "isbn", 20)
         if not re.fullmatch(r"[0-9Xx\-\s]{10,20}", isbn):
             raise ValidationError(
-                "El campo 'isbn' solo admite digitos, guiones y hasta 20 caracteres.")
+                "El campo 'isbn' solo admite digitos, la letra X, guiones y "
+                "espacios, y debe medir entre 10 y 20 caracteres.")
         data["isbn"] = isbn
     if "title" in source:
         data["title"] = _text(source["title"], "title", 255)

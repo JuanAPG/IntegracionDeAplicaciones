@@ -1,0 +1,6 @@
+# El .env lleva credenciales reales y NO se publica.
+.env
+.venv/
+__pycache__/
+*.pyc
+jar

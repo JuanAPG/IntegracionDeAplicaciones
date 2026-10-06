@@ -30,22 +30,44 @@ def _sub(parent, tag, text=None, **attrs):
     return element
 
 
+def _field(row, *names, default=""):
+    """
+    Primer nombre presente, con valor no nulo.
+
+    <user> se construye a veces desde la FILA de PostgreSQL
+    (first_name, email_verified) y a veces desde el diccionario publico
+    en camelCase que devuelve users_repository.public_user (nombre,
+    emailVerified). Aceptar las dos formas evita que el XML salga con
+    los nombres vacios segun por donde se haya llamado.
+    """
+    for name in names:
+        if name in row and row[name] is not None:
+            return row[name]
+    return default
+
+
 def user_element(row, parent=None):
     """Construye el elemento <user>."""
     if parent is None:
         user = ElementTree.Element("user", {"xmlns": NS})
     else:
         user = ElementTree.SubElement(parent, "user")
-    _sub(user, "id", row["id"])
+    _sub(user, "id", _field(row, "id"))
     names = _sub(user, "names")
-    _sub(names, "nombre", row.get("first_name") or "")
-    _sub(names, "apellidoPaterno", row.get("last_name_paternal") or "")
-    _sub(names, "apellidoMaterno", row.get("last_name_maternal") or "")
-    _sub(names, "fullName", row.get("full_name") or "")
-    _sub(user, "email", row["email"])
-    _sub(user, "role", row["role"])
-    _sub(user, "emailVerified", "true" if row.get("email_verified") else "false")
-    _sub(user, "isActive", "true" if row.get("is_active", True) else "false")
+    _sub(names, "nombre", _field(row, "first_name", "nombre"))
+    _sub(names, "apellidoPaterno", _field(row, "last_name_paternal", "apellidoPaterno"))
+    _sub(names, "apellidoMaterno", _field(row, "last_name_maternal", "apellidoMaterno"))
+    _sub(names, "fullName", _field(row, "full_name", "fullName"))
+    _sub(user, "email", _field(row, "email"))
+    _sub(user, "role", _field(row, "role"))
+    # role_id viaja en el JWT y se publica tambien aqui, para que un
+    # cliente que solo habla XML (la app Electron) pueda leer el rol.
+    _sub(user, "roleId", _field(row, "role_id", "roleId"))
+    _sub(user, "emailVerified",
+         "true" if _field(row, "email_verified", "emailVerified") else "false")
+    _sub(user, "isActive",
+         "false" if _field(row, "is_active", "isActive", default=True) is False
+         else "true")
     return user
 
 

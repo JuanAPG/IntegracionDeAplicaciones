@@ -17,17 +17,30 @@ def _run(fn):
 STATE_COLOR = {UP: theme.OK, DEGRADED: "#C8931A", DOWN: theme.DOWN}
 STATE_LABEL = {UP: "up", DEGRADED: "degradado", DOWN: "down"}
 
+# Los seis microservicios, en el orden en que se pintan los semáforos.
+SERVICIOS_SEMAFORO = (
+    ("login", "Login"), ("books", "Libros"), ("users", "Usuarios"),
+    ("authors", "Autores"), ("pedidos", "Pedidos"), ("pagos", "Pagos"),
+)
+
 
 class LibraryApp(tk.Tk):
-    def __init__(self, config, save_config, login_client, books_client,
-                 login_factory, books_factory, monitor):
+    def __init__(self, config, save_config, backend, rebuild, monitor):
+        """
+        backend  objeto con los SEIS clientes y el TokenBox compartido
+                 (ver app.py). Se recibe entero en vez de cliente por
+                 cliente: al cambiar la IP de la VM se reemplaza de una
+                 sola vez y no quedan referencias viejas por ahi.
+        rebuild  fn(config) -> Backend nuevo, para Ajustes.
+        """
         super().__init__()
         self.config = config
         self.save_config = save_config
-        self.login_client = login_client
-        self.books_client = books_client
-        self.login_factory = login_factory
-        self.books_factory = books_factory
+        self.backend = backend
+        self.rebuild = rebuild
+        self.login_client = backend.login
+        self.books_client = backend.books
+        self.tokens = backend.tokens
         self.monitor = monitor
         self.user = (config.get("session") or {}).get("user")
         self.books_cache = []
@@ -65,28 +78,33 @@ class LibraryApp(tk.Tk):
                   style="Sub.TLabel").pack(anchor="w")
         right = ttk.Frame(bar, style="Dark.TFrame")
         right.pack(side="right")
+        # Un semáforo por microservicio. En dos filas de tres para que
+        # quepan sin empujar los botones fuera de la ventana.
         sem = ttk.Frame(right, style="Dark.TFrame")
         sem.pack(side="left", padx=(0, 14))
-        self.cv_login = tk.Canvas(sem, width=12, height=12, highlightthickness=0,
-                                  background=theme.SIDEBAR)
-        self.cv_login.grid(row=0, column=0, padx=(0, 4))
-        ttk.Label(sem, text="Login", style="Dark.TLabel").grid(row=0, column=1)
-        self.cv_books = tk.Canvas(sem, width=12, height=12, highlightthickness=0,
-                                  background=theme.SIDEBAR)
-        self.cv_books.grid(row=0, column=2, padx=(12, 4))
-        ttk.Label(sem, text="Books", style="Dark.TLabel").grid(row=0, column=3)
-        self._dot(self.cv_login, "#8A8177")
-        self._dot(self.cv_books, "#8A8177")
-        self.lbl_login_state = ttk.Label(sem, text="Login …", style="Dark.TLabel",
-                                         font=("Helvetica", 8))
-        self.lbl_login_state.grid(row=1, column=0, columnspan=2, sticky="w")
-        self.lbl_books_state = ttk.Label(sem, text="Books …", style="Dark.TLabel",
-                                         font=("Helvetica", 8))
-        self.lbl_books_state.grid(row=1, column=2, columnspan=2, sticky="w")
+        self.dots = {}
+        self.dot_labels = {}
+        for indice, (clave, etiqueta) in enumerate(SERVICIOS_SEMAFORO):
+            fila, columna = divmod(indice, 3)
+            celda = ttk.Frame(sem, style="Dark.TFrame")
+            celda.grid(row=fila, column=columna, sticky="w", padx=(0, 10))
+            lienzo = tk.Canvas(celda, width=10, height=10, highlightthickness=0,
+                               background=theme.SIDEBAR)
+            lienzo.pack(side="left", padx=(0, 4))
+            self._dot(lienzo, "#8A8177")
+            self.dots[clave] = lienzo
+            texto = ttk.Label(celda, text=f"{etiqueta} …", style="Dark.TLabel",
+                              font=("Helvetica", 8))
+            texto.pack(side="left")
+            self.dot_labels[clave] = texto
 
         self.btn_auth = ttk.Button(right, text="Iniciar sesión", style="Ghost.TButton",
                                    command=self._auth_button)
         self.btn_auth.pack(side="left", padx=(0, 8))
+        self.btn_orders = ttk.Button(right, text="Pedidos y pagos",
+                                     style="Ghost.TButton",
+                                     command=self._open_orders)
+        self.btn_orders.pack(side="left", padx=(0, 8))
         self.btn_profile = ttk.Button(right, text="Perfil", style="Ghost.TButton",
                                       command=self._open_profile)
         self.btn_profile.pack(side="left", padx=(0, 8))
@@ -322,7 +340,7 @@ class LibraryApp(tk.Tk):
 
     def _session_expired(self):
         self.user = None
-        self.books_client.set_token(None)
+        self.tokens.clear()
         self.config = self.save_config(None, None, {}, None)
         self._refresh_auth_ui()
         messagebox.showwarning(
@@ -368,12 +386,14 @@ class LibraryApp(tk.Tk):
 
     def _on_authenticated(self, email, user):
         self.user = user or {"email": email}
-        token = self.login_client.token
-        self.books_client.set_token(token)
-        self.config = self.save_config(email, self.user,
-                                       self.login_client.snapshot_cookies(), token)
+        # El TokenBox ya tiene los dos tokens (lo llenó LoginClient.login);
+        # aquí solo se persisten junto con la cookie.
+        self.config = self.save_config(
+            email, self.user, self.login_client.snapshot_cookies(),
+            token=self.tokens.access, refresh_token=self.tokens.refresh)
         self._refresh_auth_ui()
-        self.status.configure(text=f"Sesión iniciada como {email}.")
+        rol = self.tokens.role or (user or {}).get("role") or "user"
+        self.status.configure(text=f"Sesión iniciada como {email} (rol {rol}).")
 
     def _do_logout(self):
         try:
@@ -381,7 +401,7 @@ class LibraryApp(tk.Tk):
         except Exception:
             pass
         self.user = None
-        self.books_client.set_token(None)
+        self.tokens.clear()
         self.config = self.save_config(None, None, {}, None)
         self.after(0, self._refresh_auth_ui)
         self.after(0, lambda: self.status.configure(text="Sesión cerrada en este equipo."))
@@ -400,7 +420,7 @@ class LibraryApp(tk.Tk):
                     self.status.configure(text="Sesión restaurada y vigente.")
                 else:
                     self.user = None
-                    self.books_client.set_token(None)
+                    self.tokens.clear()
                     self.config = self.save_config(None, None, {}, None)
                     self._refresh_auth_ui()
                     self.status.configure(text="La sesión guardada expiró.")
@@ -420,11 +440,18 @@ class LibraryApp(tk.Tk):
                                 parent=self)
             AuthDialog(self, self.login_client, self._on_authenticated)
             return
-        if self.login_client.token_expired():
-            # El JWT (1 h) vence antes que la cookie (8 h): sin token no hay
-            # escritura posible (401/403), asi que se pide login de una vez.
-            self._session_expired()
-            return
+        if self.login_client.token_expired() or self.login_client.token_expiring_soon():
+            # El token de acceso dura 30 min, pero ahora hay refresh: en
+            # vez de mandar al usuario a iniciar sesión, se renueva. Solo
+            # si la renovación falla (refresh caducado, sesión cerrada
+            # desde otro sitio o cuenta desactivada) se pide login.
+            if not self.login_client.refresh():
+                self._session_expired()
+                return
+            self.config = self.save_config(
+                (self.config.get("session") or {}).get("email"), self.user,
+                self.login_client.snapshot_cookies(),
+                token=self.tokens.access, refresh_token=self.tokens.refresh)
         self.status.configure(text="Validando sesión con el servidor…")
         def work():
             ok, _msg, user = self.login_client.get_session()
@@ -444,24 +471,31 @@ class LibraryApp(tk.Tk):
 
     # ---- semaforos ----
     def health_update(self, service, state, text, stamp):
+        """Pinta el semáforo de un servicio. Lo llama el HealthMonitor."""
         def apply():
-            dot = STATE_COLOR.get(state, theme.DOWN)
-            label = STATE_LABEL.get(state, state)
-            extra = f" · {stamp}"
-            if service == "login":
-                self._dot(self.cv_login, dot)
-                self.lbl_login_state.configure(text=f"Login {label}{extra}")
-            else:
-                self._dot(self.cv_books, dot)
-                self.lbl_books_state.configure(text=f"Books {label}{extra}")
+            lienzo = self.dots.get(service)
+            if lienzo is None:
+                return
+            etiqueta = dict(SERVICIOS_SEMAFORO).get(service, service)
+            self._dot(lienzo, STATE_COLOR.get(state, theme.DOWN))
+            self.dot_labels[service].configure(
+                text=f"{etiqueta} {STATE_LABEL.get(state, state)} · {stamp}")
             if state == DEGRADED:
-                self.status.configure(text=f"{service} degradado: {text[:110]}")
+                self.status.configure(text=f"{etiqueta} degradado: {text[:110]}")
             elif state == DOWN:
-                self.status.configure(text=f"{service} no disponible: {text[:110]}")
+                self.status.configure(text=f"{etiqueta} no disponible: {text[:110]}")
         try:
             self.after(0, apply)
         except Exception:
             pass
+
+    def _open_orders(self):
+        """Abre la ventana de pedidos y pagos."""
+        from ui_orders import OrdersWindow
+
+        OrdersWindow(self, self.backend.pedidos, self.backend.pagos,
+                     self.backend.books, self.tokens,
+                     on_stock_changed=self._load_books)
 
     # ---- datos ----
     def _load_books(self):
@@ -755,16 +789,20 @@ class LibraryApp(tk.Tk):
             import config_store as store
             store.save(cfg)
             self.config = cfg
-            self.login_client = self.login_factory(cfg)
-            self.books_client = self.books_factory(cfg)
+            # Se rehacen los SEIS clientes de una vez: así no queda
+            # ninguno apuntando a la IP anterior.
+            self.backend = self.rebuild(cfg)
+            self.login_client = self.backend.login
+            self.books_client = self.backend.books
+            self.tokens = self.backend.tokens
             if self.monitor is not None:
-                self.monitor.login_client = self.login_client
-                self.monitor.books_client = self.books_client
+                self.monitor.replace_clients(self.backend.health_clients())
                 try:
-                    _l, _b, _t, poll = store.endpoints(cfg)
+                    _timeout, poll = store.timings(cfg)
                 except Exception:
                     poll = 15
                 self.monitor.poll = poll
                 self.monitor.check_now()
             self._load_books()
-        SettingsDialog(self, self.config, on_save, self.login_factory, self.books_factory)
+
+        SettingsDialog(self, self.config, on_save, self.rebuild)

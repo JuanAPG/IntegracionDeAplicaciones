@@ -12,15 +12,24 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 os.environ.setdefault("SECRET_KEY", "secreto-de-pruebas")
-os.environ.setdefault("JWT_SECRET", "secreto-jwt-de-pruebas")
+os.environ.setdefault("JWT_SECRET_KEY", "secreto-jwt-de-pruebas")
+# Redis tambien se simula: la URL solo tiene que existir para que el
+# servicio se considere configurado; el cliente se sustituye mas abajo.
+os.environ.setdefault("REDIS_URL", "redis://:prueba@localhost:6379/0")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 import login.app as appmod  # noqa: E402
 import login.db as dbmod  # noqa: E402
+import login.shared as shared  # noqa: E402
 import login.tokens as token_box  # noqa: E402
 import login.users_repository as repo  # noqa: E402
+from library_common import testing as redis_testing  # noqa: E402
+
+# Redis en memoria: sesiones, refresh tokens y revocacion funcionan de
+# verdad (con sus TTL), pero sin servidor.
+FAKE_REDIS = redis_testing.install(shared.store)
 
 SENT = []
 USERS = {}
@@ -44,7 +53,8 @@ def fake_create_user(first, paternal, maternal, full_name, email, password_hash)
     now = datetime.now(timezone.utc)
     USERS[uid] = {"id": uid, "first_name": first, "last_name_paternal": paternal,
                   "last_name_maternal": maternal or None, "full_name": full_name,
-                  "email": email, "role": "user", "email_verified": False,
+                  "email": email, "role": "user", "role_id": 2,
+                  "email_verified": False,
                   "is_active": True, "created_at": now, "updated_at": now,
                   "last_login_at": None, "password_hash": password_hash}
     return _row(uid)
@@ -106,6 +116,10 @@ repo.token_state = fake_token_state
 repo.get_by_email = fake_get_by_email
 repo.get_by_id = fake_get_by_id
 repo.set_last_login = lambda uid: None
+# Los permisos del rol salen de library.role_permissions; sin PostgreSQL
+# se simula el resolutor (rol 2 = cliente, sin permisos administrativos).
+shared.resolver.permissions_of = lambda role_id: frozenset(
+    {"*"} if int(role_id) == 1 else set())
 appmod.mail_sender.send_verification_email = fake_send
 dbmod.ping = lambda: {"db": "library_db", "usr": "library_user",
                       "version": "PostgreSQL 16 on test"}
@@ -223,17 +237,44 @@ r = client.post("/login?format=json",
 check("login 200", r.status_code == 200 and r.get_json()["authenticated"] is True,
       body_text(r)[:200])
 data = r.get_json()
-check("login devuelve JWT Bearer",
+check("login devuelve JWT Bearer de 30 min",
       data.get("tokenType") == "Bearer" and isinstance(data.get("token"), str)
-      and len(data["token"].split(".")) == 3 and data.get("expiresIn") == 3600,
+      and len(data["token"].split(".")) == 3 and data.get("expiresIn") == 1800,
       str(sorted(data.keys())))
+check("login devuelve refresh token de 8 h",
+      isinstance(data.get("refreshToken"), str) and len(data["refreshToken"]) > 20
+      and data.get("refreshExpiresIn") == 28800
+      and data.get("renewBefore") == 300,
+      str({k: data.get(k) for k in ("refreshExpiresIn", "renewBefore")}))
 import jwt as _jwt
 try:
     claims = _jwt.decode(data["token"], options={"verify_signature": False})
     check("JWT con claims sub/email/role/exp",
           all(k in claims for k in ("sub", "email", "role", "exp", "iat")))
+    # Lo que exige el enunciado: user_id y role_id dentro del token.
+    check("JWT lleva user_id y role_id",
+          claims.get("user_id") == 1 and claims.get("role_id") == 2,
+          str({k: claims.get(k) for k in ("user_id", "role_id")}))
+    check("JWT lleva jti (clave de revocacion) y sid (sesion)",
+          bool(claims.get("jti")) and bool(claims.get("sid")))
+    check("JWT firmado con HS256",
+          _jwt.get_unverified_header(data["token"]).get("alg") == "HS256")
+    check("la sesion vive en Redis, no en la cookie",
+          FAKE_REDIS.exists(f"session:{claims['sid']}") == 1,
+          str(FAKE_REDIS.keys_matching("session:*")))
+    check("el refresh vive en Redis solo como hash SHA-256",
+          len(FAKE_REDIS.keys_matching("refresh:*")) == 1
+          and data["refreshToken"] not in str(FAKE_REDIS.snapshot()))
 except Exception as exc:
     check("JWT con claims sub/email/role/exp", False, str(exc)[:120])
+r = client.post("/login", json={"email": "ada@ejemplo.mx", "password": "Secreto123"})
+check("el XML de /login no publica los tokens",
+      r.status_code == 200 and "<token>" not in body_text(r)
+      and "<refreshToken>" not in body_text(r), body_text(r)[:160])
+check("el XML de /login si trae los nombres y el estado de la cuenta",
+      "<nombre>Ada</nombre>" in body_text(r)
+      and "<emailVerified>true</emailVerified>" in body_text(r)
+      and "<roleId>2</roleId>" in body_text(r), body_text(r)[:400])
 r = client.get("/session?format=json")
 check("sesion autenticada", r.get_json().get("authenticated") is True
       and r.get_json()["user"]["email"] == "ada@ejemplo.mx", body_text(r)[:200])
