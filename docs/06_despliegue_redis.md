@@ -627,6 +627,13 @@ con tener `JWT_SECRET` y `JWT_SECRET_KEY` a la vez con valores distintos:
 gana `JWT_SECRET_KEY`, y el otro queda como una trampa para el siguiente que
 lea el archivo.
 
+Cada servicio avisa de estas trampas al arrancar, con un `WARNING` en su
+registro (`journalctl -u <unidad> | grep 'Configuracion .env'`): una clave repetida
+en el mismo `.env` (python-dotenv usa la **última**, así que editar la
+primera no tiene efecto) y `JWT_SECRET` ≠ `JWT_SECRET_KEY`. El aviso nombra
+la clave y el archivo, nunca el valor. Si aparece, deje una sola línea por
+clave.
+
 ### El servicio no arranca: puerto ocupado
 
 ```bash

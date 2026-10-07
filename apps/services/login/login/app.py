@@ -259,6 +259,10 @@ def _current_sid():
         return None
     try:
         return codec.decode(token).get("sid")
+    except DependencyUnavailable:
+        # Redis caido: no se puede saber si el token esta revocado. Se
+        # responde 503 (fallo seguro), no "sin sesion".
+        raise
     except (SharedApiError, Unauthorized):
         return None
 
@@ -652,6 +656,10 @@ def logout():
     if token:
         try:
             claims = codec.decode(token)
+        except DependencyUnavailable:
+            # Con Redis caido no se puede revocar nada: 503, nunca un 200
+            # que haga creer al cliente que su token quedo anulado.
+            raise
         except (SharedApiError, Unauthorized):
             # Un token ya invalido no impide cerrar la sesion de la cookie.
             claims = None
@@ -673,8 +681,18 @@ def get_session():
     Consultarla RENUEVA el TTL de la sesion en Redis (ventana
     deslizante): la sesion vive mientras se use y caduca sola a las 8 h
     de inactividad.
+
+    Contrato:
+      sin credencial (ni cookie de sesion ni Authorization) -> 200
+          {"authenticated": false}
+      credencial presente pero invalida, caducada o revocada -> 401
+      Redis caido -> 503 (no se puede comprobar la sesion)
     """
+    con_credencial = bool(session.get("sid")) or bool(request.headers.get("Authorization"))
     row = _current_user()
+    if row is None and con_credencial:
+        raise Unauthorized("La sesion no es valida: caduco, se cerro o fue revocada.",
+                           ["Inicie sesion de nuevo (POST /login)."])
     if row is None:
         payload = {"authenticated": False}
     else:
@@ -723,13 +741,16 @@ def handle_dependency_down(exc):
 
 @app.errorhandler(db.DatabaseUnavailable)
 def handle_db_down(exc):
-    log.error("PostgreSQL no disponible: %s", exc)
+    # El texto de psycopg y usuario@host:puerto/db van al registro, no al
+    # cliente: ahi es donde los busca quien opera el servicio.
+    log.error("PostgreSQL no disponible (%s@%s:%s/%s): %s - revise PGHOST/PGPORT/"
+              "PGUSER/PGPASSWORD en login/.env", config.PGUSER, config.PGHOST,
+              config.PGPORT, config.PGDATABASE, exc)
     return _error_response(
         503, "database_unavailable",
         "No hay conexion con PostgreSQL.",
-        [str(exc).strip(),
-         f"Revise PGHOST/PGPORT/PGUSER/PGPASSWORD en login/.env "
-         f"(destino actual: {config.PGUSER}@{config.PGHOST}:{config.PGPORT}/{config.PGDATABASE})."])
+        ["La base de datos no responde. Reintente en unos segundos; "
+         "el detalle tecnico queda en el registro del servicio."])
 
 
 @app.errorhandler(HTTPException)

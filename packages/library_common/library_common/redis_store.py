@@ -40,6 +40,10 @@ from .errors import RedisUnavailable
 
 log = logging.getLogger("library.redis")
 
+# Lo unico que ve el cliente en un 503 de Redis.
+UNAVAILABLE_DETAIL = ("Redis no responde. Reintente en unos segundos; "
+                      "el detalle tecnico queda en el registro del servicio.")
+
 # Devuelve el valor previo y borra la clave en un solo paso atomico. Se
 # usa para que un refresh token sea de un solo uso incluso si dos
 # peticiones llegan a la vez (GETDEL existe desde Redis 6.2; este script
@@ -130,7 +134,7 @@ class RedisStore:
                         self._note_failure(exc)
                         raise RedisUnavailable(
                             "No se pudo crear el cliente de Redis.",
-                            [str(exc).strip()]) from exc
+                            [UNAVAILABLE_DETAIL]) from exc
         return self._client
 
     def _note_failure(self, exc):
@@ -211,10 +215,11 @@ class RedisStore:
             raise
         except Exception as exc:                       # noqa: BLE001
             self._note_failure(exc)
+            # El errno y el host:puerto quedan en el registro (_note_failure),
+            # no en la respuesta: el cliente no necesita la topologia interna.
             raise RedisUnavailable(
                 "Redis no esta disponible y la operacion no puede continuar sin el.",
-                [str(exc).strip(),
-                 f"Destino: {env.redacted(self.url)}",
+                [UNAVAILABLE_DETAIL,
                  "Sesiones, refresh tokens y revocacion de JWT dependen de Redis."
                  ]) from exc
 

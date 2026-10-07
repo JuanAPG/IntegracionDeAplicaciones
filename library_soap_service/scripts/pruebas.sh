@@ -22,7 +22,7 @@ BASE="${BASE:-http://localhost:5001}"
 API="$BASE${API_PREFIX:-}"
 ISBN_PRUEBA="978-9999999999"
 # JWT Bearer para las escrituras (lo emite POST /login del microservicio
-# login). Sin el solo se prueban los 401/403; con el, el ciclo completo:
+# login). Sin el solo se prueban los 401; con el, el ciclo completo:
 #   JWT=<token> ./scripts/pruebas.sh
 AUTH=()
 [ -n "${JWT:-}" ] && AUTH=(-H "Authorization: Bearer $JWT")
@@ -45,10 +45,44 @@ esperado_http() {
 # contiene <descripcion> <texto literal> <curl args...>
 # -F: el texto se compara tal cual, sin interpretarlo como expresion regular
 # (patrones como '"concepts": []' llevan corchetes).
+# Insensible a espacios: el JSON sale compacto ("price":175.0) con
+# DEBUG=false y con espacios en desarrollo; se normalizan ambos lados.
 contiene() {
     local desc="$1" texto="$2"; shift 2
-    if curl -s "$@" | grep -qF -- "$texto"; then pasa "$desc"
+    local plano cuerpo
+    plano=$(printf '%s' "$texto" | tr -d '[:space:]')
+    # Primero se lee la respuesta entera y luego se busca: con pipefail,
+    # "curl | grep -q" puede fallar al azar: grep sale al primer acierto y
+    # curl recibe SIGPIPE al seguir escribiendo.
+    cuerpo=$(curl -s "$@" | tr -d '[:space:]')
+    if grep -qF -- "$plano" <<<"$cuerpo"; then pasa "$desc"
     else falla "$desc (no aparece: $texto)"; fi
+}
+
+# cabecera <descripcion> <nombre de cabecera> <curl args...>
+# Busca la cabecera en la respuesta SIN distinguir mayusculas: los nombres
+# de cabecera HTTP no las distinguen y un servidor o proxy puede mandarlos
+# en minusculas (access-control-allow-origin).
+cabecera() {
+    local desc="$1" nombre="$2"; shift 2
+    local cabeceras
+    cabeceras=$(curl -s -D - -o /dev/null "$@")
+    if grep -qiF -- "$nombre:" <<<"$cabeceras"; then pasa "$desc"
+    else falla "$desc (no aparece la cabecera $nombre)"; fi
+}
+
+# alta <curl args...>
+# Hace un POST de alta. Deja el cuerpo en ALTA_CUERPO y el id del libro
+# creado en ALTA_ID, leido de la cabecera Location (/books/<id>). No se
+# saca del cuerpo: la respuesta trae otros "id" anidados (autores,
+# imagenes, conceptos) y un patron sobre el JSON puede tomar el que no es.
+alta() {
+    local cabeceras
+    cabeceras=$(mktemp)
+    ALTA_CUERPO=$(curl -s -D "$cabeceras" "$@")
+    ALTA_ID=$(grep -i '^location:' "$cabeceras" | tr -d '\r' \
+        | sed -n 's|.*/books/\([0-9][0-9]*\).*|\1|p' | head -1)
+    rm -f "$cabeceras"
 }
 
 echo "Microservicio: $BASE"
@@ -65,7 +99,7 @@ echo
 echo "2. Lectura"
 esperado_http "todos los libros"        200 "$API/books"
 contiene "la coleccion trae libros"     '"books"'   "$API/books?limit=2&output=json"
-contiene "la cabecera X-Total-Count"    'X-Total-Count' -D - -o /dev/null "$API/books?limit=1"
+cabecera "la cabecera X-Total-Count"    'X-Total-Count' "$API/books?limit=1"
 esperado_http "un libro por id"         200 "$API/books/1"
 esperado_http "un libro por ISBN"       200 "$API/books/isbn/978-0133970777"
 esperado_http "libro inexistente"       404 "$API/books/999999"
@@ -104,7 +138,9 @@ esperado_http "POST sin token es 401" 401 -X POST "$API/books" \
     -H 'Content-Type: application/json' -d '{"title":"X"}'
 esperado_http "Bearer malformado es 401" 401 -X POST "$API/books" \
     -H 'Content-Type: application/json' -H 'Authorization: Token abc' -d '{"title":"X"}'
-esperado_http "token falso es 403" 403 -X POST "$API/books" \
+# Token invalido (firma, formato, caducado, revocado) -> 401. El 403 queda
+# para un token VALIDO cuyo rol no alcanza para la operacion.
+esperado_http "token falso es 401" 401 -X POST "$API/books" \
     -H 'Content-Type: application/json' -H 'Authorization: Bearer falso123' -d '{"title":"X"}'
 contiene "el 401 tambien sale en XML" '<error xmlns=' -X POST "$API/books?output=xml" \
     -H 'Content-Type: application/json' -d '{"title":"X"}'
@@ -115,10 +151,12 @@ if [ -z "${JWT:-}" ]; then
     echo "  (sin JWT: se omite el ciclo de alta/modificacion/baja; pase JWT=<token> para probarlo)"
 else
 # Limpieza previa por si una corrida anterior se interrumpio.
-id_previo=$(curl -s "$API/books/isbn/$ISBN_PRUEBA?output=json" | sed -n 's/.*"id": *\([0-9]*\).*/\1/p' | head -1)
+# El primer "id" del cuerpo es el del libro (los anidados van despues).
+id_previo=$(curl -s "$API/books/isbn/$ISBN_PRUEBA?output=json" | grep -o '"id": *[0-9]*' \
+    | head -1 | tr -dc '0-9')
 [ -n "$id_previo" ] && curl -s -o /dev/null -X DELETE "$API/books/$id_previo" ${AUTH[@]+"${AUTH[@]}"}
 
-respuesta=$(curl -s -X POST "$API/books?output=json" -H 'Content-Type: application/json' ${AUTH[@]+"${AUTH[@]}"} -d "{
+alta -X POST "$API/books?output=json" -H 'Content-Type: application/json' ${AUTH[@]+"${AUTH[@]}"} -d "{
   \"isbn\": \"$ISBN_PRUEBA\",
   \"title\": \"Libro de prueba automatizada\",
   \"publicationYear\": 2026,
@@ -130,11 +168,11 @@ respuesta=$(curl -s -X POST "$API/books?output=json" -H 'Content-Type: applicati
   \"genres\": [\"Genero De Prueba\"],
   \"concepts\": [{\"name\": \"Concepto De Prueba\", \"definition\": \"Definicion de prueba.\"}],
   \"images\": [{\"url\": \"https://example.org/portada.jpg\", \"isCover\": true}]
-}")
-NUEVO_ID=$(printf '%s' "$respuesta" | sed -n 's/.*"id": *\([0-9]*\).*/\1/p' | head -1)
+}"
+NUEVO_ID="$ALTA_ID"
 
 if [ -n "$NUEVO_ID" ]; then pasa "alta de un libro (id $NUEVO_ID)"
-else falla "alta de un libro: $respuesta"; fi
+else falla "alta de un libro: $ALTA_CUERPO"; fi
 
 if [ -n "$NUEVO_ID" ]; then
     contiene "actualizar (PATCH cambia el precio)" '"price": 175' \
@@ -151,7 +189,7 @@ fi
 
 echo
 echo "7. Alta con el cuerpo en XML (respuesta pedida en JSON)"
-xml_id=$(curl -s -X POST "$API/books?output=json" -H 'Content-Type: application/xml' ${AUTH[@]+"${AUTH[@]}"} --data-binary "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+alta -X POST "$API/books?output=json" -H 'Content-Type: application/xml' ${AUTH[@]+"${AUTH[@]}"} --data-binary "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <book xmlns=\"urn:library:catalog:1.0\" isbn=\"$ISBN_PRUEBA\">
   <title>Libro de prueba en XML</title>
   <publicationYear>2026</publicationYear>
@@ -160,12 +198,13 @@ xml_id=$(curl -s -X POST "$API/books?output=json" -H 'Content-Type: application/
   <format>Digital</format>
   <category>Tecnico</category>
   <authors count=\"1\"><author>Autor De Prueba</author></authors>
-</book>" | sed -n 's/.*"id": *\([0-9]*\).*/\1/p' | head -1)
+</book>"
+xml_id="$ALTA_ID"
 if [ -n "$xml_id" ]; then
     pasa "alta con cuerpo XML (id $xml_id)"
     esperado_http "baja del libro creado en XML" 200 -X DELETE "$API/books/$xml_id" ${AUTH[@]+"${AUTH[@]}"}
 else
-    falla "alta con cuerpo XML"
+    falla "alta con cuerpo XML: $ALTA_CUERPO"
 fi
 fi # fin del ciclo de escritura (requiere JWT)
 
@@ -186,10 +225,10 @@ contiene "el error tambien sale en XML" '<error xmlns=' "$API/books/999999?outpu
 
 echo
 echo "9. CORS (cliente de otro dominio)"
-contiene "cabecera en peticion simple" 'Access-Control-Allow-Origin' \
-    -D - -o /dev/null -H 'Origin: https://cliente.otrodominio.com' "$API/books?limit=1"
-contiene "preflight de PUT" 'Access-Control-Allow-Methods' \
-    -D - -o /dev/null -X OPTIONS -H 'Origin: https://cliente.otrodominio.com' \
+cabecera "cabecera en peticion simple" 'Access-Control-Allow-Origin' \
+    -H 'Origin: https://cliente.otrodominio.com' "$API/books?limit=1"
+cabecera "preflight de PUT" 'Access-Control-Allow-Methods' \
+    -X OPTIONS -H 'Origin: https://cliente.otrodominio.com' \
     -H 'Access-Control-Request-Method: PUT' -H 'Access-Control-Request-Headers: Content-Type' \
     "$API/books/1"
 

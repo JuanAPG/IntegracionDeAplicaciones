@@ -12,6 +12,18 @@ puede informar el fallo en lugar de morir al importar.
 
 Todo el SQL de los servicios usa parametros (%s): nunca se concatena un
 valor del usuario dentro de una consulta.
+
+QUE ES UN 503 Y QUE NO
+  Solo un fallo de CONEXION (servidor caido, red, pool agotado) se
+  traduce a DatabaseUnavailable (503). Un error de la propia consulta
+  —un RAISE EXCEPTION de un procedimiento, una violacion UNIQUE, una
+  funcion inexistente— se propaga tal cual: el servicio lo convierte en
+  409/400 (raised_message, is_unique_violation) o, si es un fallo de
+  programacion, acaba en el 500 generico. Disfrazarlo de "base caida"
+  esconde el error real.
+
+  El cuerpo del 503 no lleva el texto de psycopg ni usuario@host:puerto:
+  ese detalle va al registro del servicio, no al cliente.
 """
 import logging
 import threading
@@ -21,6 +33,39 @@ from . import metrics
 from .errors import DatabaseUnavailable
 
 log = logging.getLogger("library.db")
+
+# Lo unico que ve el cliente en un 503 de PostgreSQL.
+UNAVAILABLE_DETAILS = ("La base de datos no responde. Reintente en unos segundos; "
+                       "el detalle tecnico queda en el registro del servicio.",)
+
+
+def is_connection_error(exc):
+    """
+    True si la excepcion es un fallo de CONEXION con PostgreSQL.
+
+    psycopg.OperationalError cubre servidor caido, red cortada y
+    PoolTimeout (pool agotado); InterfaceError, una conexion ya rota.
+    El resto de errores de psycopg son de la consulta, no de la base.
+    """
+    try:
+        import psycopg
+    except ImportError:                                # pragma: no cover
+        return False
+    return isinstance(exc, (psycopg.OperationalError, psycopg.InterfaceError))
+
+
+def pool_check_kwargs(pool_class):
+    """
+    Argumentos para que el pool PRUEBE cada conexion antes de prestarla.
+
+    Tras reiniciar PostgreSQL, las conexiones que el pool guardaba estan
+    muertas y la primera consulta de cada una fallaria con un 503. Con
+    check, el pool las descarta al prestarlas y abre otras. Cuesta un
+    viaje de ida y vuelta por peticion. Existe desde psycopg_pool 3.2;
+    con una version anterior el pool funciona igual, sin la prueba.
+    """
+    check = getattr(pool_class, "check_connection", None)
+    return {"check": check} if check is not None else {}
 
 
 class Database:
@@ -70,12 +115,18 @@ class Database:
                             kwargs={"row_factory": dict_row},
                             timeout=self.connect_timeout,
                             open=True,
+                            **pool_check_kwargs(ConnectionPool),
                         )
                     except Exception as exc:           # noqa: BLE001
-                        raise DatabaseUnavailable(
-                            "No hay conexion con PostgreSQL.",
-                            [str(exc).strip(), f"Destino actual: {self.target}."]) from exc
+                        raise self._unavailable(exc) from exc
         return self._pool
+
+    def _unavailable(self, exc):
+        """Registra el fallo con su detalle y devuelve el 503 sin el."""
+        metrics.incr("db.error")
+        log.error("PostgreSQL no disponible (%s): %s", self.target, str(exc).strip())
+        return DatabaseUnavailable("No hay conexion con PostgreSQL.",
+                                   list(UNAVAILABLE_DETAILS))
 
     @contextmanager
     def connection(self):
@@ -84,18 +135,16 @@ class Database:
         except DatabaseUnavailable:
             raise
         except Exception as exc:                       # noqa: BLE001
-            raise DatabaseUnavailable("No hay conexion con PostgreSQL.",
-                                      [str(exc).strip()]) from exc
+            raise self._unavailable(exc) from exc
         try:
             with pool.connection() as conn:
                 yield conn
-        except DatabaseUnavailable:
-            raise
         except Exception as exc:                       # noqa: BLE001
-            metrics.incr("db.error")
-            raise DatabaseUnavailable(
-                "No hay conexion con PostgreSQL.",
-                [str(exc).strip(), f"Destino actual: {self.target}."]) from exc
+            if not is_connection_error(exc):
+                # Error de la consulta (o de la ruta que la usa): que lo
+                # trate quien llamo. Ver "QUE ES UN 503 Y QUE NO".
+                raise
+            raise self._unavailable(exc) from exc
 
     @contextmanager
     def cursor(self, commit=False):

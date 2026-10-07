@@ -16,6 +16,14 @@ LA LOGICA DELICADA ESTA EN LA BASE
   sp_cambiar_estado_pedido. Asi la regla se cumple aunque la escriba otro
   cliente, y la reserva de stock es atomica de verdad.
 
+LLAMADAS A PROCEDIMIENTOS: CADA PARAMETRO CON SU CAST
+  Psycopg 3 envia los parametros tipados: un int pequeno viaja como
+  smallint, un float como double precision y un str o None como unknown.
+  PostgreSQL resuelve la sobrecarga de una funcion solo con conversiones
+  IMPLICITAS, y double precision -> numeric no lo es: sin el cast la
+  llamada falla con "function ... does not exist". Por eso cada %s lleva
+  el tipo exacto de la firma del procedimiento.
+
 Todas las consultas usan parametros (%s). El nombre de la columna de
 ordenacion sale de una lista blanca.
 """
@@ -238,7 +246,8 @@ def create_order(user_id, lines, notes=None, currency="MXN",
                           for l in lines])
     with database.cursor(commit=True) as cur:
         cur.execute(
-            "SELECT sp_crear_pedido(%s, %s::jsonb, %s, %s, %s, %s) AS id",
+            "SELECT sp_crear_pedido(%s::integer, %s::jsonb, %s::text, "
+            "%s::char(3), %s::numeric, %s::text) AS id",
             (user_id, payload, notes, currency, shipping_cost, shipping_address))
         return cur.fetchone()["id"]
 
@@ -246,14 +255,14 @@ def create_order(user_id, lines, notes=None, currency="MXN",
 def adjust_line(order_id, book_id, quantity):
     """Cambia la cantidad de una linea ajustando el stock por la diferencia."""
     with database.cursor(commit=True) as cur:
-        cur.execute("SELECT sp_ajustar_linea_pedido(%s, %s, %s)",
+        cur.execute("SELECT sp_ajustar_linea_pedido(%s::bigint, %s::integer, %s::integer)",
                     (order_id, book_id, quantity))
 
 
 def cancel_order(order_id, changed_by=None, reason=None):
     """Cancela DEVOLVIENDO el stock reservado."""
     with database.cursor(commit=True) as cur:
-        cur.execute("SELECT sp_cancelar_pedido(%s, %s, %s)",
+        cur.execute("SELECT sp_cancelar_pedido(%s::bigint, %s::integer, %s::varchar)",
                     (order_id, changed_by, reason))
 
 
@@ -262,6 +271,6 @@ def change_status(order_id, to_status, changed_by=None, note=None,
     """Mueve el estado. La transicion la valida un disparador de la base."""
     with database.cursor(commit=True) as cur:
         cur.execute(
-            "SELECT sp_cambiar_estado_pedido(%s, %s::library.order_status, "
-            "%s, %s, %s, %s)",
+            "SELECT sp_cambiar_estado_pedido(%s::bigint, %s::library.order_status, "
+            "%s::integer, %s::varchar, %s::varchar, %s::varchar)",
             (order_id, to_status, changed_by, note, carrier, tracking_code))
