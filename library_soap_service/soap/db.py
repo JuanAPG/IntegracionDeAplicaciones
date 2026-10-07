@@ -5,6 +5,14 @@ Acceso a PostgreSQL: pool de conexiones y utilidades de transaccion.
 El pool se crea de forma perezosa (en la primera consulta) para que el
 proceso pueda arrancar aunque la base de datos todavia no este disponible;
 asi /health puede informar el fallo en lugar de morir al importar.
+
+CONEXIONES MUERTAS
+  Tras reiniciar PostgreSQL, las conexiones guardadas en el pool siguen
+  pareciendo abiertas hasta que se usan. Por eso cada conexion se prueba
+  (SELECT 1) antes de prestarla y se descarta si no responde; y una que
+  se rompe a media consulta se cierra en lugar de volver al pool.
+  Un fallo de CONEXION (OperationalError/InterfaceError) es un 503
+  (DatabaseUnavailable); los errores de la consulta se propagan tal cual.
 """
 import threading
 from contextlib import contextmanager
@@ -52,18 +60,53 @@ def get_pool():
     return _pool
 
 
+_CONNECTION_ERRORS = (psycopg2.OperationalError, psycopg2.InterfaceError)
+
+
+def _alive(conn):
+    """True si la conexion responde. Deja la conexion sin transaccion abierta."""
+    if conn.closed:
+        return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        conn.rollback()
+        return True
+    except _CONNECTION_ERRORS:
+        return False
+
+
+def _checkout(pool):
+    """
+    Una conexion VIVA del pool. Las muertas se cierran y se descartan; se
+    intenta tantas veces como conexiones puede guardar el pool, mas una
+    nueva.
+    """
+    last = None
+    for _ in range(config.DB_POOL_MAX + 1):
+        try:
+            conn = pool.getconn()
+        except psycopg2.Error as exc:
+            raise DatabaseUnavailable(str(exc).strip()) from exc
+        if _alive(conn):
+            return conn
+        last = "la conexion del pool no responde"
+        pool.putconn(conn, close=True)
+    raise DatabaseUnavailable(last or "sin conexion")
+
+
 @contextmanager
 def connection():
-    """Presta una conexion del pool y la devuelve siempre."""
+    """Presta una conexion viva del pool y la devuelve siempre."""
     pool = get_pool()
-    try:
-        conn = pool.getconn()
-    except psycopg2.Error as exc:
-        raise DatabaseUnavailable(str(exc).strip()) from exc
+    conn = _checkout(pool)
     try:
         yield conn
+    except _CONNECTION_ERRORS as exc:
+        raise DatabaseUnavailable(str(exc).strip()) from exc
     finally:
-        pool.putconn(conn)
+        # Una conexion rota no vuelve al pool: se cierra.
+        pool.putconn(conn, close=bool(conn.closed))
 
 
 @contextmanager
@@ -84,10 +127,17 @@ def cursor(commit=False):
             else:
                 conn.rollback()
         except Exception:
-            conn.rollback()
+            # Con la conexion rota, el rollback fallaria y taparia el
+            # error original.
+            if not conn.closed:
+                try:
+                    conn.rollback()
+                except _CONNECTION_ERRORS:
+                    pass
             raise
         finally:
-            cur.close()
+            if not cur.closed:
+                cur.close()
 
 
 def ping():

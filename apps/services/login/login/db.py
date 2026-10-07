@@ -38,6 +38,7 @@ def get_pool():
                 try:
                     from psycopg_pool import ConnectionPool
                     from psycopg.rows import dict_row
+                    from library_common.db import pool_check_kwargs
 
                     _pool = ConnectionPool(
                         _conninfo(),
@@ -45,6 +46,9 @@ def get_pool():
                         max_size=config.DB_POOL_MAX,
                         kwargs={"row_factory": dict_row},
                         timeout=config.DB_CONNECT_TIMEOUT,
+                        # Descarta las conexiones muertas tras reiniciar
+                        # PostgreSQL (ver library_common.db.pool_check_kwargs).
+                        **pool_check_kwargs(ConnectionPool),
                     )
                 except Exception as exc:  # noqa: BLE001 - se reporta al cliente
                     raise DatabaseUnavailable(str(exc).strip()) from exc

@@ -54,6 +54,20 @@ def is_connection_error(exc):
     return isinstance(exc, (psycopg.OperationalError, psycopg.InterfaceError))
 
 
+def pool_check_kwargs(pool_class):
+    """
+    Argumentos para que el pool PRUEBE cada conexion antes de prestarla.
+
+    Tras reiniciar PostgreSQL, las conexiones que el pool guardaba estan
+    muertas y la primera consulta de cada una fallaria con un 503. Con
+    check, el pool las descarta al prestarlas y abre otras. Cuesta un
+    viaje de ida y vuelta por peticion. Existe desde psycopg_pool 3.2;
+    con una version anterior el pool funciona igual, sin la prueba.
+    """
+    check = getattr(pool_class, "check_connection", None)
+    return {"check": check} if check is not None else {}
+
+
 class Database:
     def __init__(self, *, host="localhost", port=5432, dbname="library_db",
                  user="library_user", password="", schema="library",
@@ -101,6 +115,7 @@ class Database:
                             kwargs={"row_factory": dict_row},
                             timeout=self.connect_timeout,
                             open=True,
+                            **pool_check_kwargs(ConnectionPool),
                         )
                     except Exception as exc:           # noqa: BLE001
                         raise self._unavailable(exc) from exc
