@@ -81,6 +81,18 @@ curl -b jar http://localhost:5000/session?format=json
 curl -b jar -X POST http://localhost:5000/logout?format=json
 ```
 
+Contrato de `GET /session`:
+
+| Petición | Respuesta |
+|---|---|
+| Sin cookie de sesión ni `Authorization` | `200 {"authenticated": false}` |
+| Cookie o Bearer presentes pero inválidos, caducados o revocados | `401` |
+| Redis caído (no se puede comprobar la sesión) | `503` |
+
+`POST /logout` es idempotente: sin sesión, o con un token ya inválido o
+revocado, responde `200`. Con Redis caído responde `503`, nunca un `200`
+que haga creer al cliente que su token quedó revocado.
+
 ---
 
 ## 3. Restricciones de la práctica

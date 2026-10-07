@@ -22,7 +22,7 @@ BASE="${BASE:-http://localhost:5001}"
 API="$BASE${API_PREFIX:-}"
 ISBN_PRUEBA="978-9999999999"
 # JWT Bearer para las escrituras (lo emite POST /login del microservicio
-# login). Sin el solo se prueban los 401/403; con el, el ciclo completo:
+# login). Sin el solo se prueban los 401; con el, el ciclo completo:
 #   JWT=<token> ./scripts/pruebas.sh
 AUTH=()
 [ -n "${JWT:-}" ] && AUTH=(-H "Authorization: Bearer $JWT")
@@ -47,8 +47,25 @@ esperado_http() {
 # (patrones como '"concepts": []' llevan corchetes).
 contiene() {
     local desc="$1" texto="$2"; shift 2
-    if curl -s "$@" | grep -qF -- "$texto"; then pasa "$desc"
+    local cuerpo
+    # Primero se lee la respuesta entera y luego se busca: con pipefail,
+    # "curl | grep -q" puede fallar al azar: grep sale al primer acierto y
+    # curl recibe SIGPIPE al seguir escribiendo.
+    cuerpo=$(curl -s "$@")
+    if grep -qF -- "$texto" <<<"$cuerpo"; then pasa "$desc"
     else falla "$desc (no aparece: $texto)"; fi
+}
+
+# cabecera <descripcion> <nombre de cabecera> <curl args...>
+# Busca la cabecera en la respuesta SIN distinguir mayusculas: los nombres
+# de cabecera HTTP no las distinguen y un servidor o proxy puede mandarlos
+# en minusculas (access-control-allow-origin).
+cabecera() {
+    local desc="$1" nombre="$2"; shift 2
+    local cabeceras
+    cabeceras=$(curl -s -D - -o /dev/null "$@")
+    if grep -qiF -- "$nombre:" <<<"$cabeceras"; then pasa "$desc"
+    else falla "$desc (no aparece la cabecera $nombre)"; fi
 }
 
 echo "Microservicio: $BASE"
@@ -65,7 +82,7 @@ echo
 echo "2. Lectura"
 esperado_http "todos los libros"        200 "$API/books"
 contiene "la coleccion trae libros"     '"books"'   "$API/books?limit=2&output=json"
-contiene "la cabecera X-Total-Count"    'X-Total-Count' -D - -o /dev/null "$API/books?limit=1"
+cabecera "la cabecera X-Total-Count"    'X-Total-Count' "$API/books?limit=1"
 esperado_http "un libro por id"         200 "$API/books/1"
 esperado_http "un libro por ISBN"       200 "$API/books/isbn/978-0133970777"
 esperado_http "libro inexistente"       404 "$API/books/999999"
@@ -104,7 +121,9 @@ esperado_http "POST sin token es 401" 401 -X POST "$API/books" \
     -H 'Content-Type: application/json' -d '{"title":"X"}'
 esperado_http "Bearer malformado es 401" 401 -X POST "$API/books" \
     -H 'Content-Type: application/json' -H 'Authorization: Token abc' -d '{"title":"X"}'
-esperado_http "token falso es 403" 403 -X POST "$API/books" \
+# Token invalido (firma, formato, caducado, revocado) -> 401. El 403 queda
+# para un token VALIDO cuyo rol no alcanza para la operacion.
+esperado_http "token falso es 401" 401 -X POST "$API/books" \
     -H 'Content-Type: application/json' -H 'Authorization: Bearer falso123' -d '{"title":"X"}'
 contiene "el 401 tambien sale en XML" '<error xmlns=' -X POST "$API/books?output=xml" \
     -H 'Content-Type: application/json' -d '{"title":"X"}'
@@ -186,10 +205,10 @@ contiene "el error tambien sale en XML" '<error xmlns=' "$API/books/999999?outpu
 
 echo
 echo "9. CORS (cliente de otro dominio)"
-contiene "cabecera en peticion simple" 'Access-Control-Allow-Origin' \
-    -D - -o /dev/null -H 'Origin: https://cliente.otrodominio.com' "$API/books?limit=1"
-contiene "preflight de PUT" 'Access-Control-Allow-Methods' \
-    -D - -o /dev/null -X OPTIONS -H 'Origin: https://cliente.otrodominio.com' \
+cabecera "cabecera en peticion simple" 'Access-Control-Allow-Origin' \
+    -H 'Origin: https://cliente.otrodominio.com' "$API/books?limit=1"
+cabecera "preflight de PUT" 'Access-Control-Allow-Methods' \
+    -X OPTIONS -H 'Origin: https://cliente.otrodominio.com' \
     -H 'Access-Control-Request-Method: PUT' -H 'Access-Control-Request-Headers: Content-Type' \
     "$API/books/1"
 

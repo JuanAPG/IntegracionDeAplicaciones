@@ -596,13 +596,16 @@ def handle_dependency_down(exc):
 
 @app.errorhandler(db.DatabaseUnavailable)
 def handle_db_down(exc):
-    log.error("PostgreSQL no disponible: %s", exc)
+    # El texto de psycopg y usuario@host:puerto/db van al registro, no al
+    # cliente: ahi es donde los busca quien opera el servicio.
+    log.error("PostgreSQL no disponible (%s@%s:%s/%s): %s - revise PGHOST/PGPORT/"
+              "PGUSER/PGPASSWORD en soap/.env", config.PGUSER, config.PGHOST,
+              config.PGPORT, config.PGDATABASE, exc)
     return _error_response(
         503, "database_unavailable",
         "No hay conexion con PostgreSQL.",
-        [str(exc).strip(),
-         f"Revise PGHOST/PGPORT/PGUSER/PGPASSWORD en soap/.env "
-         f"(destino actual: {config.PGUSER}@{config.PGHOST}:{config.PGPORT}/{config.PGDATABASE})."])
+        ["La base de datos no responde. Reintente en unos segundos; "
+         "el detalle tecnico queda en el registro del servicio."])
 
 
 @app.errorhandler(HTTPException)

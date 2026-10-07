@@ -65,9 +65,13 @@ esperado_http() {
 # espacios en desarrollo; se normalizan ambos lados.
 contiene() {
     local desc="$1" texto="$2"; shift 2
-    local plano
+    local plano cuerpo
     plano=$(printf '%s' "$texto" | tr -d '[:space:]')
-    if curl -s "$@" | tr -d '[:space:]' | grep -qF -- "$plano"; then pasa "$desc"
+    # Primero se lee la respuesta entera y luego se busca: con pipefail,
+    # "curl | grep -q" falla al azar (grep sale al primer acierto y curl
+    # muere por SIGPIPE), y un no_contiene daria un OK falso.
+    cuerpo=$(curl -s "$@" | tr -d '[:space:]')
+    if grep -qF -- "$plano" <<<"$cuerpo"; then pasa "$desc"
     else falla "$desc (no aparece: $texto)"; fi
 }
 
@@ -76,9 +80,10 @@ contiene() {
 # lo que hace falta para comprobar que el rastreo publico no filtra nada.
 no_contiene() {
     local desc="$1" texto="$2"; shift 2
-    local plano
+    local plano cuerpo
     plano=$(printf '%s' "$texto" | tr -d '[:space:]')
-    if curl -s "$@" | tr -d '[:space:]' | grep -qiF -- "$plano"; then
+    cuerpo=$(curl -s "$@" | tr -d '[:space:]')
+    if grep -qiF -- "$plano" <<<"$cuerpo"; then
         falla "$desc (aparece: $texto)"
     else pasa "$desc"; fi
 }

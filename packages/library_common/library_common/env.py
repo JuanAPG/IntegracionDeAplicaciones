@@ -13,9 +13,12 @@ un secreto se escribe una vez y lo leen los seis microservicios.
 override=False en los dos load_dotenv: lo que ya venga del entorno real
 (systemd, contenedor, CI) manda, y el .env solo rellena huecos.
 """
+import logging
 import os
 
 from dotenv import load_dotenv
+
+log = logging.getLogger("library.env")
 
 # Valores de ejemplo que NO cuentan como configuracion real: si un secreto
 # tiene uno de estos, el servicio lo reporta como ausente en /health.
@@ -48,7 +51,61 @@ def load_dotenvs(service_file, depth):
     load_dotenv(os.path.join(root, ".env"), override=False)
     service_root = os.path.dirname(os.path.dirname(path))
     load_dotenv(os.path.join(service_root, ".env"), override=False)
+    check_dotenvs(os.path.join(root, ".env"), os.path.join(service_root, ".env"))
     return root, service_root
+
+
+def _assignments(path):
+    """(clave, valor) de cada linea CLAVE=valor de un .env, en orden."""
+    pares = []
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for linea in fh:
+                linea = linea.strip()
+                if linea.startswith("export "):
+                    linea = linea[len("export "):].lstrip()
+                if not linea or linea.startswith("#") or "=" not in linea:
+                    continue
+                clave, _, valor = linea.partition("=")
+                pares.append((clave.strip(), valor.strip().strip("'\"")))
+    except OSError:
+        pass
+    return pares
+
+
+def check_dotenvs(*paths):
+    """
+    Avisa (WARNING) de las trampas de configuracion que no impiden
+    arrancar pero si confunden al siguiente que edite el .env:
+
+      * una clave repetida en el mismo .env (python-dotenv se queda con
+        la ULTIMA; quien edite la primera no vera efecto);
+      * JWT_SECRET y JWT_SECRET_KEY a la vez con valores distintos (gana
+        JWT_SECRET_KEY, ver docs/06_despliegue_redis.md §8).
+
+    Nunca escribe un valor en el registro: solo nombres de clave y rutas.
+    Devuelve la lista de avisos (util en pruebas).
+    """
+    avisos = []
+    for path in dict.fromkeys(os.path.abspath(p) for p in paths):
+        valores = {}
+        for clave, valor in _assignments(path):
+            valores.setdefault(clave, []).append(valor)
+        for clave, vistos in valores.items():
+            if len(vistos) > 1:
+                como = ("con valores DISTINTOS; se usa el ultimo" if len(set(vistos)) > 1
+                        else "con el mismo valor")
+                avisos.append(f"{path}: la clave {clave} aparece {len(vistos)} veces ({como}).")
+    nuevo, viejo = os.getenv("JWT_SECRET_KEY"), os.getenv("JWT_SECRET")
+    if nuevo and viejo and nuevo != viejo:
+        avisos.append("JWT_SECRET_KEY y JWT_SECRET tienen valores distintos: se usa "
+                      "JWT_SECRET_KEY. Deje solo JWT_SECRET_KEY, identico en los seis "
+                      "servicios (docs/06_despliegue_redis.md §8).")
+    # Se emite antes de que el servicio configure su logging: el prefijo
+    # permite encontrarlo igual en journalctl.
+    for aviso in avisos:
+        log.warning("Configuracion .env: %s", aviso)
+    return avisos
 
 
 def get(name, default=""):

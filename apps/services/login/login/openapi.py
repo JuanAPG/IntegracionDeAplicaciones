@@ -157,6 +157,10 @@ def build_spec():
             "/logout": {
                 "post": {
                     "summary": "Cerrar la sesion",
+                    "description": (
+                        "Idempotente: sin sesion, o con un token ya invalido o "
+                        "revocado, responde 200 igual. Con Redis caido responde "
+                        "503: no se puede revocar el token."),
                     "parameters": [_format_param()],
                     "responses": _responses({"type": "object"}),
                 }
@@ -164,6 +168,10 @@ def build_spec():
             "/session": {
                 "get": {
                     "summary": "Consultar la sesion autenticada",
+                    "description": (
+                        "Sin credencial (ni cookie de sesion ni Authorization): "
+                        "200 `{\"authenticated\": false}`. Credencial presente "
+                        "pero invalida, caducada o revocada: 401. Redis caido: 503."),
                     "parameters": [_format_param()],
                     "responses": _responses({"type": "object"}),
                 }

@@ -13,8 +13,8 @@ que funcione:
   3. /refresh ROTA: el refresh viejo deja de servir y el token de acceso
      anterior queda REVOCADO en el acto.
   4. /logout revoca el jti: el token deja de servir antes de caducar.
-  5. Fallo SEGURO: con Redis caido, /login, /refresh y /session devuelven
-     503 en lugar de emitir o aceptar credenciales no revocables.
+  5. Fallo SEGURO: con Redis caido, /login, /refresh, /session y /logout
+     devuelven 503 en lugar de emitir o aceptar credenciales no revocables.
   6. Un token caducado, con otra firma o con alg=none se rechaza con 401.
 
 Uso (desde apps/services/login):
@@ -210,8 +210,20 @@ check("consultarla renovo el TTL (ventana deslizante)",
       r.get_json().get("authenticated") is True)
 FAKE.advance(config.SESSION_TTL + 60)
 r = client.get("/session?format=json")
-check("sin uso, la sesion caduca sola",
-      r.get_json().get("authenticated") is False, str(r.get_json()))
+check("sin uso, la sesion caduca sola (cookie presente pero caducada -> 401)",
+      r.status_code == 401, f"{r.status_code} {r.get_json()}")
+r = client.get("/session?format=json")
+check("la cookie caducada se borra: la siguiente consulta es 'sin sesion'",
+      r.status_code == 200 and r.get_json().get("authenticated") is False,
+      f"{r.status_code} {r.get_json()}")
+anon = appmod.app.test_client()
+r = anon.get("/session?format=json",
+             headers={"Authorization": "Bearer basura.que.no.es.jwt"})
+check("session con Bearer basura -> 401", r.status_code == 401,
+      f"{r.status_code} {r.get_json()}")
+r = anon.get("/session?format=json")
+check("session sin credencial -> 200 authenticated:false",
+      r.status_code == 200 and r.get_json().get("authenticated") is False)
 
 print("8. Tokens invalidos: 401, nunca 403")
 _r, data = hacer_login()
@@ -276,6 +288,16 @@ r = client.post("/refresh?format=json", json={"refreshToken": "lo-que-sea"})
 check("refresh con Redis caido -> 503", r.status_code == 503)
 r = client.get("/session?format=json")
 check("session con Redis caido -> 503", r.status_code == 503)
+check("el 503 de Redis no expone el error de conexion ni el host",
+      "Connection refused" not in r.get_data(as_text=True)
+      and "localhost" not in r.get_data(as_text=True), r.get_data(as_text=True)[:300])
+sin_cookie = appmod.app.test_client()
+r = sin_cookie.get("/session?format=json", headers={"Authorization": f"Bearer {bueno}"})
+check("session solo con Bearer y Redis caido -> 503 (no 200 'sin sesion')",
+      r.status_code == 503, f"{r.status_code} {r.get_data(as_text=True)[:160]}")
+r = sin_cookie.post("/logout?format=json", headers={"Authorization": f"Bearer {bueno}"})
+check("logout solo con Bearer y Redis caido -> 503 (no finge revocar)",
+      r.status_code == 503, f"{r.status_code} {r.get_data(as_text=True)[:160]}")
 r = client.get("/health?format=json")
 check("health con Redis caido -> 503 y lo dice",
       r.status_code == 503 and r.get_json()["redis"]["status"] == "error",

@@ -19,6 +19,14 @@ EL PAGO MUEVE EL PEDIDO, PERO NO LO DECIDE ESTE CODIGO
 La logica delicada vive en procedimientos almacenados
 (sp_registrar_pago, sp_aplicar_pago, sp_cambiar_estado_pago), definidos
 en data/pagos_migration.sql.
+
+LLAMADAS A PROCEDIMIENTOS: CADA PARAMETRO CON SU CAST
+  Psycopg 3 envia los parametros tipados: un int pequeno viaja como
+  smallint, un float como double precision y un str o None como unknown.
+  PostgreSQL resuelve la sobrecarga de una funcion solo con conversiones
+  IMPLICITAS, y double precision -> numeric no lo es: sin el cast la
+  llamada falla con "function ... does not exist". Por eso cada %s lleva
+  el tipo exacto de la firma del procedimiento.
 """
 from .shared import database
 
@@ -232,7 +240,8 @@ def register_payment(order_id, method_id, amount, registered_by=None,
     """
     with database.cursor(commit=True) as cur:
         cur.execute(
-            "SELECT sp_registrar_pago(%s, %s, %s, %s, %s, %s, %s, %s) AS id",
+            "SELECT sp_registrar_pago(%s::bigint, %s::integer, %s::numeric, "
+            "%s::integer, %s::varchar, %s::varchar, %s::char(4), %s::varchar) AS id",
             (order_id, method_id, amount, registered_by, idempotency_key,
              authorization_code, card_last4, notes))
         return cur.fetchone()["id"]
@@ -244,7 +253,7 @@ def apply_payment(payment_id, changed_by=None, authorization_code=None):
     un disparador de la base lo pasa a 'pagado'.
     """
     with database.cursor(commit=True) as cur:
-        cur.execute("SELECT sp_aplicar_pago(%s, %s, %s)",
+        cur.execute("SELECT sp_aplicar_pago(%s::bigint, %s::integer, %s::varchar)",
                     (payment_id, changed_by, authorization_code))
 
 
@@ -252,5 +261,6 @@ def change_status(payment_id, to_status, changed_by=None, note=None):
     """Rechaza o reembolsa. La transicion la valida un disparador."""
     with database.cursor(commit=True) as cur:
         cur.execute(
-            "SELECT sp_cambiar_estado_pago(%s, %s::library.payment_status, %s, %s)",
+            "SELECT sp_cambiar_estado_pago(%s::bigint, %s::library.payment_status, "
+            "%s::integer, %s::varchar)",
             (payment_id, to_status, changed_by, note))
