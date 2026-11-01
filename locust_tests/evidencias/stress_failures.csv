@@ -1,0 +1,2 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+GET,[monolito] GET /library/libros?q= (busqueda HTML),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",1,2026-10-30T21:45:57Z,2026-10-30T21:45:57Z

@@ -1,0 +1,26 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+GET,[books] GET /books?format=xml (catalogo),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",14,2026-10-30T21:52:34Z,2026-10-30T22:05:44Z
+GET,[users] GET /users [401 esperado],"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",2,2026-10-30T22:04:14Z,2026-10-30T22:05:51Z
+GET,[books] GET /books?format=json (catalogo),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",31,2026-10-30T21:52:08Z,2026-10-30T22:05:57Z
+GET,[login] GET /session [401 esperado],"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",6,2026-10-30T21:52:45Z,2026-10-30T22:05:49Z
+GET,[authors] GET /authors?format=xml (listado),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",5,2026-10-30T21:52:45Z,2026-10-30T22:04:15Z
+GET,[authors] GET /health,"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",6,2026-10-30T21:52:46Z,2026-10-30T22:05:39Z
+GET,[books] GET /books/<ISBN>?format=json (detalle),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",19,2026-10-30T21:52:27Z,2026-10-30T22:05:47Z
+GET,[login] GET /metrics [401 esperado],"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",5,2026-10-30T21:52:48Z,2026-10-30T22:05:04Z
+GET,[authors] GET /authors/<id>?format=json (detalle),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",20,2026-10-30T21:52:22Z,2026-10-30T22:05:50Z
+GET,[books] GET /books?<filtros> (busqueda),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",7,2026-10-30T21:52:29Z,2026-10-30T22:05:43Z
+GET,[monolito] GET /library/login (formulario),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",2,2026-10-30T22:04:48Z,2026-10-30T22:05:14Z
+GET,[monolito] GET /library/libros/<ISBN> (detalle HTML),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",15,2026-10-30T21:52:28Z,2026-10-30T22:05:40Z
+GET,[authors] GET /authors?format=json (listado),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",21,2026-10-30T21:52:10Z,2026-10-30T22:05:53Z
+GET,[pedidos] GET /metrics [401 esperado],"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",2,2026-10-30T21:52:31Z,2026-10-30T22:04:59Z
+GET,[monolito] GET /library/libros (catalogo HTML),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",21,2026-10-30T21:52:24Z,2026-10-30T22:05:56Z
+GET,[pedidos] GET /health,"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",6,2026-10-30T21:52:32Z,2026-10-30T22:05:23Z
+GET,[pagos] GET /health,"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",8,2026-10-30T21:52:11Z,2026-10-30T22:05:35Z
+GET,[users] GET /health,"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",6,2026-10-30T21:52:35Z,2026-10-30T22:05:42Z
+GET,[pagos] GET /payments [401 esperado],"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",14,2026-10-30T21:52:26Z,2026-10-30T22:05:53Z
+GET,[pedidos] GET /orders [401 esperado],"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",6,2026-10-30T21:52:27Z,2026-10-30T22:05:52Z
+GET,[monolito] GET /library/ (portada),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",11,2026-10-30T21:52:56Z,2026-10-30T22:05:46Z
+GET,[books] GET /health,"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",5,2026-10-30T21:53:01Z,2026-10-30T22:05:42Z
+GET,[pagos] GET /metrics [401 esperado],"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",5,2026-10-30T21:52:21Z,2026-10-30T22:05:04Z
+GET,[monolito] GET /library/libros?q= (busqueda HTML),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",12,2026-10-30T21:52:48Z,2026-10-30T22:05:40Z
+GET,[login] GET /health,"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",8,2026-10-30T21:52:07Z,2026-10-30T22:05:48Z
