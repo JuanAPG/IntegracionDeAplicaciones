@@ -1,102 +1,129 @@
 # Reflexión
 
-Pruebas de rendimiento con Locust sobre la Librería en Línea · instancia `34.51.65.207` · 2026-10-30. Todos los números citados salen de `evidencias/` y de las tablas de [`RESULTADOS.md`](RESULTADOS.md). No hay ninguna cifra estimada.
+Pruebas de rendimiento con Locust sobre la Librería en Línea, instancia `maquina-01` de GCP. **Dos tandas** contra **dos despliegues distintos**: 2026-10-30 (procesos lanzados a mano, Werkzeug) y 2026-11-01 (el despliegue del repositorio, gunicorn). Todos los números salen de `evidencias/` y de las tablas de [`RESULTADOS.md`](RESULTADOS.md). No hay ninguna cifra estimada.
 
 ## 1. ¿Qué diferencias observaste entre el monolito y los microservicios? ¿Qué evidencia las sustenta?
 
-La diferencia medible fue **la contraria a la que esperaba**: el monolito resultó más rápido. Con 20 usuarios (perfil `stress`, 1268 peticiones), el catálogo del monolito dio **p50 de 95 ms** contra los **140 ms** del mismo catálogo en `books`, y el detalle de un libro **51 ms** contra **100 ms**. Y eso pese a que el monolito sirve HTML renderizado con EJS (16.7 KB) y el microservicio solo serializa JSON (18.9 KB).
+**En latencia, el monolito salió más rápido en las dos tandas, y en las dos por el mismo motivo, que no es la arquitectura.**
 
-La evidencia que explica la diferencia no está en los tiempos, sino en las cabeceras:
+En octubre, con 20 usuarios, el catálogo del monolito dio p50 de **95 ms** contra los **140 ms** del mismo catálogo en `books`, y el detalle **51 ms** contra **100 ms** — y eso sirviendo HTML renderizado con EJS (16.7 KB) frente a JSON (18.9 KB). La explicación no estaba en los tiempos sino en las cabeceras:
 
 ```
 monolito :3000   Connection: keep-alive   Keep-Alive: timeout=5
 books    :5001   Server: Werkzeug/3.1.9   Connection: close
 ```
 
-Los seis microservicios corren con el **servidor de desarrollo de Flask**, que cierra la conexión tras cada respuesta. Cada petición paga un saludo TCP nuevo, y el ping a la instancia es de ~24 ms: un saludo cuesta una ida y vuelta, lo que cuadra casi exactamente con los 45-50 ms de diferencia observados. El monolito, con Express y keep-alive, reutiliza la conexión.
+Mi conclusión entonces fue "los seis corren con el servidor de desarrollo de Flask, que cierra la conexión". **La segunda tanda la corrigió.** Ahora los seis corren con **gunicorn**, y al volver a mirar la cabecera:
 
-**Por eso la conclusión honesta es que esta prueba no compara arquitecturas: compara configuraciones de despliegue.** Para comparar monolito contra microservicios habría que servir los seis con gunicorn y keep-alive; mientras no sea así, cualquier ventaja del monolito se explica por el transporte. Es la lección que más me costó aceptar, porque el resultado numérico invitaba a concluir lo contrario.
+```
+books :5001   Server: gunicorn   Connection: close
+```
+
+Sigue cerrando. El worker síncrono de gunicorn tampoco mantiene la conexión viva, así que cada petición sigue pagando un saludo TCP completo —unos 24 ms de ida y vuelta hasta GCP—. **La causa no era "Werkzeug": era la pila Flask tal como está desplegada, con cualquiera de los dos servidores.** Me pareció importante corregirlo en vez de dejar la frase de octubre, que sonaba bien y era falsa.
+
+**En robustez, la diferencia fue del otro signo y mucho más grande.** En el `stress` del 1-nov, con la misma rampa, en la misma máquina y al mismo tiempo:
+
+| Destino | Peticiones | Fallos |
+|---|---|---|
+| **monolito** | 401 | **386 (96.3 %)** |
+| books | 371 | 0 |
+| authors | 210 | 0 |
+| login · pagos · pedidos · users | 290 | 0 |
+
+El monolito dejó de responder a mitad de la rampa y no volvió. Los seis microservicios terminaron sin un solo fallo.
+
+La comparación de latencia de la tanda 2, eso sí, **no es válida**: el catálogo de este monolito exige sesión y no usé credenciales, de modo que sus tareas midieron un **302** —enrutado y comprobación de sesión— y no una consulta con su plantilla. Que aparezca con 52-96 ms frente a 140-150 ms de `books` no dice que sea más rápido: dice que se le midió menos trabajo. Prefiero decirlo así que presentar un número que favorece la conclusión fácil.
 
 ## 2. ¿Qué servicio o ruta mostró primero degradación y cómo lo determinaste?
 
-**Ninguno se degradó por carga dentro de los límites del enunciado**, y decirlo así es más exacto que señalar un culpable. En `stress`, con 20 usuarios y 7 RPS, el p95 global se quedó en 140 ms —siete veces por debajo del umbral de 1 s— con un 0.08 % de errores (1 fallo de 1268: una conexión caída en la búsqueda del monolito).
+**El monolito, y con diferencia.** Lo determiné por el reparto de los fallos, no por una impresión: los 386 fallos del `stress` son **todos suyos** (`stress_failures.csv`), mientras los otros seis destinos acumulaban 871 peticiones con cero.
 
-Lo que sí ocurrió fue una **caída completa de la instancia durante el soak**, y lo determiné por tres indicios, no por uno:
+La cronología, de los `.log`:
 
-1. Los 66 fallos aparecieron en **los siete destinos a la vez**, que son siete procesos distintos: ninguna carga individual explica eso.
-2. Sucedió con **3 usuarios**, la carga más baja de la práctica, cuarenta minutos después de aguantar 20 sin esfuerzo.
-3. El patrón fue **colgarse y después morir**: el p50 y el p95 saltaron de 100 y 140 ms a **13 000-17 000 ms** —el techo del tiempo límite de 15 s— antes de que apareciera un solo fallo, y el RPS cayó a cero porque los tres usuarios estaban todos esperando. Horas después, los puertos ya rechazaban la conexión al instante. Un proceso muerto rechaza de inmediato; colgarse primero indica procesos vivos que no podían avanzar, que es la firma de un recurso agotado en la máquina.
+| Momento | Estado del monolito |
+|---|---|
+| 16:59, smoke (1 usuario) | 200, cero fallos |
+| 17:01, load (5 usuarios) | 121 peticiones, **cero fallos**, p95 100 ms |
+| 17:03:09, stress (~8-11 usuarios) | empiezan los fallos: conexión rechazada o cerrada |
+| 17:05, ya sin carga | `:3000` **rechaza al instante**; los seis microservicios siguen en 200 |
 
-La confirmación llegó al terminar: ICMP respondía con 0 % de pérdida, el puerto 22 aceptaba conexiones desde esta misma IP, y los siete puertos de aplicación rechazaban la conexión. La máquina estaba viva; los procesos, no. La causa raíz no la pude establecer porque el SSH a la instancia pide una llave que no está en este equipo, y **no la invento**: queda como comprobación pendiente en la máquina (`systemctl status` y `journalctl` alrededor de las 21:51 UTC).
+**Y aquí me obligué a parar.** Que se cayera *durante* la rampa no prueba que se cayera *por* la rampa: lo lancé a mano con `npm start`, sin supervisor, y un proceso así muere igual por una señal del terminal o por una excepción no capturada. Un proceso muerto rechaza al instante, que es lo que medí, pero eso encaja con las dos explicaciones. La causa está en `/tmp/monolito.log` de la instancia y **quedó pendiente de leer**. Lo que sí es independiente de la causa: el monolito fue el único de los siete que no terminó la prueba, y el único sin unidad de systemd que lo reponga — por eso tampoco sobrevivió al reinicio de la VM, mientras los seis microservicios volvieron solos.
+
+En octubre la respuesta fue distinta: **ninguno se degradó por carga**, y lo que hubo fue una caída de la instancia entera durante el soak —los siete a la vez, con 3 usuarios, cuarenta minutos después de aguantar 20—. Esa sí la diagnostiqué por tres indicios: los fallos aparecieron en siete procesos distintos a la vez; la carga era la más baja de la práctica; y el patrón fue **colgarse y después morir** (p50 y p95 saltaron de 100 y 140 ms a 13 000-17 000 ms antes de que apareciera un solo fallo). Al revisar después la consola serie de la instancia aparecieron 45 líneas de `Worker was sent SIGKILL! Perhaps out of memory?`, lo que **corrobora** el agotamiento de memoria — aunque la ventana exacta de la caída no quedó registrada en la consola, así que es respaldo, no prueba.
 
 ## 3. ¿Qué diferencias hubo entre load, stress, spike, soak y punto de quiebre?
 
-Cada perfil responde a una pregunta distinta, y en esta corrida se vio con claridad:
+Cada perfil responde a una pregunta distinta, y en estas dos tandas se vio con claridad:
 
-- **Load** (5 usuarios, 2 min) mide el régimen esperado. Dio 3.02 RPS y 0 % de errores. Lo interesante es que **ese RPS lo impuso el cliente, no el servidor**: 5 usuarios con pausa de 1-2 s no pueden pedir más. Un load nunca mide capacidad.
-- **Stress** (2→20 por etapas) busca el punto donde se dobla la curva. No se dobló: siete escalones y el p95 inmóvil en 140 ms. La conclusión útil es negativa —"20 usuarios no bastan"—, y es un resultado, no un fracaso.
-- **Spike** (2→15 de golpe y vuelta a 2) mide dos cosas que el stress no ve: el golpe y la **recuperación**. El RPS pasó de 1.1 a 9.5 en cinco segundos, el p95 subió de 140 a 160 ms durante unos diez segundos y volvió a 140. La recuperación fue inmediata, que era la pregunta de verdad.
-- **Soak** (3 usuarios, 4 min) no busca picos sino **deriva**. Fue el único que encontró algo, y precisamente porque mira el tiempo: 170 segundos planos y después la caída. Un stress de tres minutos no la habría visto.
-- **Punto de quiebre** no es un perfil más: es un perfil **adaptativo**, que sube hasta incumplir el umbral y deja de subir. En esta corrida **no fue válido** porque se ejecutó contra la instancia ya caída y las 257 peticiones fallaron por conexión rechazada.
+- **Load** (5 usuarios, 2 min) mide el régimen esperado: 3.08 RPS y 0 % de errores. Lo importante es que **ese RPS lo impuso el cliente, no el servidor**: 5 usuarios con pausa de 1-2 s no pueden pedir más. Un load nunca mide capacidad.
+- **Stress** (2→20 por etapas) busca dónde se dobla la curva. En los microservicios no se dobló; **en el monolito no se dobló: se rompió**. La diferencia entre degradarse y caerse es justo lo que un stress sirve para distinguir.
+- **Spike** (2→15 de golpe y vuelta a 2) mide dos cosas que el stress no ve: el golpe y la **recuperación**. Cero errores, p95 de 140 ms, recuperación inmediata.
+- **Soak** (3 usuarios, 4 min) no busca picos sino **deriva**. En octubre fue el único que encontró algo, y precisamente porque mira el tiempo: 170 segundos planos y después la caída. En noviembre, cuatro minutos planos y cero fallos: **la caída no se reprodujo**, que es un resultado y no un no-resultado.
+- **Punto de quiebre** no es un perfil más: es **adaptativo**, sube hasta incumplir el umbral y deja de subir. En octubre no fue válido (se ejecutó contra la instancia ya caída). En noviembre **sí**: 240 s completos, hasta 20 usuarios, 12.5 RPS sostenidos, p95 clavado en 140 ms y cero fallos. **No se alcanzó el quiebre**, y eso también responde la pregunta: está por encima de 20 usuarios en estas condiciones.
 
-En una frase: load describe lo normal, stress busca el techo, spike mide el golpe y la recuperación, soak busca la deriva en el tiempo y el punto de quiebre busca una cifra concreta de concurrencia.
+En una frase: load describe lo normal, stress busca el techo, spike mide el golpe y la recuperación, soak busca la deriva en el tiempo, y el punto de quiebre busca una cifra concreta de concurrencia.
 
 ## 4. ¿Qué limitaciones tuvo la prueba?
 
-**Duración.** Los seis perfiles suman unos 16 minutos. El soak de 4 minutos es una miniatura: una fuga de conexiones o de memoria puede tardar horas en manifestarse. El punto de quiebre sale de una ventana de 4 minutos, no de una curva de capacidad.
+**Duración.** Los seis perfiles suman ~16 minutos. El soak de 4 minutos es una miniatura: una fuga de conexiones o de memoria puede tardar horas. El punto de quiebre sale de una ventana de 4 minutos, no de una curva de capacidad.
 
-**Rutas.** Solo tres de los siete destinos tienen lecturas públicas de datos: monolito, books y authors. De `login`, `users`, `pedidos` y `pagos` únicamente se midieron `/health` y el rechazo `401`, porque sus operaciones de negocio son escrituras y el enunciado pide preferir lecturas que no cambien datos. Comparar su p95 con el del catálogo sería comparar cosas distintas.
+**Rutas.** Solo tres de los siete destinos tienen lecturas públicas de datos. De `login`, `users`, `pedidos` y `pagos` se midieron `/health`, `/metrics` y el rechazo `401`. Y `/envios/<numero>`, la única ruta pública de pedidos, devuelve 404 siempre porque **no hay ningún pedido en la base**: lo que mide es la consulta que acaba en 404.
 
-**Datos.** El catálogo tiene 31 libros y 35 autores. Con ese volumen, PostgreSQL resuelve casi todo en memoria y la caché de Redis acierta mucho: la prueba mide el camino caliente, no el comportamiento con un catálogo grande ni con índices bajo presión.
+**El monolito, mal medido.** Sin credenciales, su catálogo es un 302. La única lectura real suya es la portada. El par comparable —el núcleo de la práctica— quedó sin medir en la tanda 2.
 
-**Equipo y red.** La carga se generó desde un portátil por Internet hasta GCP. Cada medición incluye el viaje de ida y vuelta, que en el smoke ya era del orden de 100 ms sin carga: ese suelo está dentro de todos los números y no es culpa del servidor. Además, un único generador de carga puede saturarse antes que el servidor; con las concurrencias de esta práctica no se llegó a ese punto, pero es un techo real.
+**Datos.** 16 libros y 24 autores (31 y 35 en octubre). Con ese volumen PostgreSQL resuelve casi todo en memoria y Redis acierta entre el 43 % y el 55 % de las veces: se mide el camino caliente, no un catálogo grande.
 
-**Generación de carga.** La pausa de 1-2 segundos entre tareas limita el RPS por diseño. El RPS observado dice cuánto pidieron estos clientes, no cuánto aguanta el sistema.
+**Equipo y red.** La carga se generó desde un portátil por Internet hasta GCP. Cada medición incluye el viaje de ida y vuelta (~24 ms), que está dentro de todos los números y no es culpa del servidor.
+
+**Generación de carga.** La pausa de 1-2 s entre tareas limita el RPS por diseño. El RPS observado dice cuánto pidieron estos clientes, no cuánto aguanta el sistema.
+
+**Dos despliegues.** La mitad del trabajo de la segunda tanda fue descubrir que ya no medía lo mismo. Los números de las dos tandas **no se comparan entre sí**.
 
 ## 5. ¿Qué sugerencia de IA ayudó, qué hubo que corregir y qué aprendí?
 
-**Lo que ayudó.** La estructura del archivo: separar los perfiles en una `LoadTestShape` controlada por una variable de entorno, en vez de seis archivos casi iguales, y validar el **cuerpo** de cada respuesta con `catch_response` en lugar de conformarse con el código de estado. Eso último resultó decisivo: varias respuestas con estado 200 no traían lo que debían.
+**Lo que ayudó.** Dos cosas, y las dos estructurales. La primera, meter los seis perfiles en una `LoadTestShape` controlada por una variable de entorno en vez de seis archivos casi iguales. La segunda, y más valiosa: **validar el cuerpo de cada respuesta** con `catch_response` en lugar de conformarse con el código de estado. Resultó decisivo — sin eso, media tanda habría pasado midiendo otra cosa.
 
-**Lo que tuve que corregir y comprobar: la comprobación de los componentes y su integración.** No bastó con pedir el código; hubo que verificar uno por uno qué estaba realmente levantado y cómo encajaba:
+**Lo que tuve que corregir y comprobar.** El grueso del trabajo, y casi todo fue verificar componentes e integración:
 
-- El mapa de puertos del enunciado está invertido respecto a lo desplegado. Lo comprobé pidiendo `/health` a cada puerto y leyendo el nombre del servicio que declara: `5002` es `users` y no `pagos`, `5004` es `orders` y no `users`. Si no lo llego a comprobar, las estadísticas habrían salido etiquetadas al revés.
-- La versión desplegada no es la del repositorio, ni en `books` ni en el monolito: filtros en español, el JSON envuelto en `libros`, el detalle por ISBN, y rutas enteras que en el repo existen y en la instancia dan 404. Todas las rutas del `locustfile.py` se verificaron con `curl` contra la instancia antes de escribir una sola aserción.
-- Una primera versión repartía la carga en siete clases de usuario, una por destino. Al ejecutar el smoke de **1 usuario** descubrí que Locust le asigna ese único usuario a **una** clase: seis destinos se quedaron sin una sola petición. Lo reestructuré a una clase que recorre los siete con URL absoluta.
-- La búsqueda del monolito (`?q=`) busca por título o ISBN, no por autor ni género: términos como `orwell` devolvían cero resultados y una página sin tarjetas, y mi aserción los contaba como fallo del servicio. Corregí los términos en vez de aflojar la aserción.
+- **El mapa de puertos del enunciado está invertido.** Lo comprobé pidiendo la identidad a cada puerto y leyendo el nombre del servicio que declara: `5002` es `users`, no `pagos`. Sin comprobarlo, las estadísticas habrían salido etiquetadas al revés.
+- **Una primera versión repartía la carga en siete clases de usuario.** Al ejecutar el smoke de **1 usuario** descubrí que Locust le asigna ese único usuario a **una** clase: seis destinos se quedaron sin una sola petición. Lo reestructuré a una clase que recorre los siete con URL absoluta.
+- **El despliegue cambió debajo de la prueba.** Tras el reinicio, lo que arrancó systemd no era lo que se midió el 30-oct: cambiaron las rutas, las claves del JSON, los filtros (de español a inglés), la visibilidad de `/metrics` y hasta los datos. Tuve que reinventariar las rutas con `curl` y rehacer todas las aserciones. **Lo peor fue que los filtros viejos no dan error: se ignoran en silencio** y devuelven el catálogo entero con `filters` vacío. Una aserción escrita contra el contrato viejo habría pasado tan campante midiendo una cosa distinta, así que la tarea de búsqueda ahora comprueba que `filters` no venga vacío.
+- **Un defecto en el propio `locustfile.py` que descubrí ejecutando:** el sondeo de arranque usaba el límite de 15 s de las peticiones normales. Con cuatro destinos caídos eso son 60 s bloqueando el arranque — más que el perfil smoke entero (30 s), así que la prueba terminaba **sin lanzar ni una petición**. Ahora el sondeo tiene su propio límite de 3 s.
+- **Y antes, otro peor:** al evaluar el umbral con el destino caído, una excepción mataba en silencio el greenlet de la forma de carga y la prueba seguía indefinidamente — 4 minutos previstos, 13 reales. El cálculo va ahora dentro de un `try`, y si no hay ni una petición con éxito el perfil se aborta declarando "destino caído" en vez de inventar un punto de quiebre falso con 2 usuarios.
 
-**Lo que aprendí por mi cuenta.** Que una prueba de carga es, antes que nada, una prueba de integración: el 90 % del trabajo fue verificar qué componentes estaban arriba, en qué puerto, con qué contrato y qué devuelven de verdad. Un `locustfile` escrito contra la documentación habría corrido sin errores y habría medido mentiras.
+**Lo que aprendí por mi cuenta.** Que una prueba de carga es, antes que nada, **una prueba de integración**: el 90 % del trabajo fue verificar qué estaba arriba, en qué puerto, con qué contrato y qué devuelve de verdad. Un `locustfile` escrito contra la documentación habría corrido sin errores y habría medido mentiras. Y una segunda lección, más incómoda: **cuando un número confirma lo que esperabas, es cuando más hay que buscarle la causa**. La ventaja del monolito encajaba con un relato razonable ("el monolito hace menos saltos"), y resultó ser un saludo TCP.
 
 ## 6. ¿Qué cambiaría en la arquitectura o en la siguiente prueba?
 
 **En la arquitectura.**
 
-1. **Alinear lo desplegado con el repositorio.** Hoy conviven dos implementaciones distintas de `books` y del monolito. Cualquier medición envejece mal mientras eso siga así, y un cliente escrito contra el repo falla contra la instancia.
-2. **Servir los servicios con gunicorn y no con el servidor de desarrollo.** La cabecera `Server: Werkzeug` y el `Connection: close` de `books` indican que no hay reutilización de conexión: cada petición paga un saludo TCP nuevo.
-3. **Dar al monolito una ruta de salud.** Es el único de los siete sin `/health`, y por eso hay que usar la portada como sustituto, que consulta la base y no distingue "vivo" de "sano".
+1. **Dar al monolito una unidad de systemd con `Restart=always`.** Es el único de los siete sin supervisor: por eso no sobrevivió al reinicio y por eso, cuando cayó a mitad del stress, no volvió. Los seis microservicios volvieron solos.
+2. **Servir los seis con un worker que mantenga la conexión viva** (gunicorn con `gthread`/`uvicorn`, o un proxy delante). Hoy, con gunicorn síncrono, cada petición paga un saludo TCP nuevo, y eso es la mitad de la latencia medida.
+3. **Dar al monolito una ruta de salud.** Es el único sin `/health`, y hay que usar la portada como sustituto, que consulta la base y no distingue "vivo" de "sano".
+4. **Alinear lo desplegado con el repositorio y dejarlo en systemd.** Que convivieran dos implementaciones distintas obligó a medir dos veces y a tirar la comparación entre tandas.
 
 **En la siguiente prueba.**
 
-1. Medir **un destino a la vez** con toda la concurrencia, en lugar de repartir los usuarios entre siete. El número de usuarios de esta práctica es la concurrencia del sistema completo; para hablar de la capacidad de `books` hay que apuntarle solo a él.
-2. Bajar la pausa entre tareas para que el RPS lo imponga el servidor y no el cliente.
-3. Incluir las operaciones de negocio de `pedidos` y `pagos` contra una base de datos de pruebas desechable, que es la única forma honesta de medir escrituras.
-4. Alargar el soak a horas y vigilar a la vez las conexiones de PostgreSQL y la memoria de los procesos, que es donde se vería una fuga.
+1. **Medir el par comparable de verdad**, con sesión en el monolito (`MONO_EMAIL`/`MONO_PASSWORD`, que el `locustfile.py` ya admite). Sin eso, la comparación central de la práctica no existe.
+2. **Repetir el stress con el monolito supervisado**, para separar "se cayó por la carga" de "se cayó porque lo lancé a mano".
+3. **Medir un destino a la vez** con toda la concurrencia, en lugar de repartir los usuarios entre siete.
+4. **Bajar la pausa entre tareas** para que el RPS lo imponga el servidor y no el cliente, y subir por encima de 20 usuarios: ahí no está el quiebre.
+5. **Vigilar la máquina por dentro** (CPU, memoria, conexiones de PostgreSQL) a la vez que se genera la carga. Las dos incógnitas que quedaron abiertas —la caída de octubre y la del monolito— se habrían resuelto solas con eso.
 
 ## 7. ¿Qué indican las gráficas?
 
-Las gráficas están en los reportes HTML de `evidencias/` (`load.html`, `stress.html`, `spike.html`, `soak.html`), cada uno con tres paneles: peticiones por segundo, tiempos de respuesta (mediana y p95) y usuarios activos. Lo que muestran, perfil por perfil:
+Los reportes HTML de `evidencias/2026-11-01/` y `evidencias/2026-10-30/` traen tres paneles cada uno: peticiones por segundo, tiempos de respuesta (mediana y p95) y usuarios activos. Hay que leerlos **juntos**: casi todo el diagnóstico sale de comparar un panel con otro.
 
-**`load.html` — tres líneas planas.** El panel de usuarios sube en escalera de 0 a 5 durante los primeros cinco segundos y se queda horizontal. El de RPS se estabiliza en ~3 y no se mueve. El de tiempos muestra la mediana y el p95 pegados y rectos (100 y 140 ms). Tres líneas planas es exactamente lo que debe dar un load sano: el sistema absorbe la carga esperada sin que nada se acumule.
+**`quiebre.html` (1-nov) — la escalera que no se traduce en latencia.** Es la gráfica más informativa de las dos tandas (captura en `evidencias/2026-11-01/capturas/01_quiebre_graficas_rps_latencia_y_fallos.jpg`). El panel de usuarios sube en escalera recta de 1 a 20, un peldaño cada 12 segundos. El de RPS **la copia fielmente**, de ~0.6 a 12.5. Y el tercero, el de tiempos, **se queda plano**: la mediana en 95 ms y el p95 en 140 ms de principio a fin, con la línea de fallos pegada al eje. Lo que indica es que el sistema todavía está en su zona lineal: **el trabajo entra, se despacha y no se acumula**. Cuando un sistema se acerca a su límite, el p95 se despega de la mediana y empieza a trepar mientras el RPS deja de subir aunque entren más usuarios. Aquí no pasa ninguna de las dos cosas, y por eso la conclusión es "el quiebre está más arriba" y no "aguanta justo 20".
 
-**`stress.html` — la escalera que no se traduce en latencia.** El panel de usuarios dibuja los siete escalones (2, 5, 8, 11, 14, 17, 20) y el de RPS los copia fielmente, subiendo hasta ~7. La gráfica importante es la tercera: **el p95 sigue plano mientras el RPS se multiplica por siete**. Cuando un sistema se acerca a su límite, esa línea se despega de la mediana y empieza a trepar; aquí no lo hace. Es la prueba visual de que el cuello de botella no se alcanzó.
+**`stress.html` (1-nov) — dos sistemas en la misma gráfica** (capturas `02_stress_fallos_suben_con_la_latencia_plana.jpg` y `03_stress_los_386_fallos_son_del_monolito.jpg`). El panel de RPS sube con la escalera de usuarios hasta ~7 y luego **pierde altura**, y la línea roja de fallos despega a los 50 segundos y ya no vuelve a bajar. Pero el panel de tiempos **sigue plano en 140 ms**. Esa combinación —fallos subiendo con la latencia quieta— es la firma de un componente que **deja de aceptar conexiones** en vez de ponerse lento: una conexión rechazada se resuelve en milisegundos, de modo que no mueve el percentil, solo el contador de errores. Si el sistema estuviera saturado, la latencia subiría *antes* que los fallos. La tabla por destino confirma lo que la forma sugiere: el único que falla es el monolito.
 
-**`spike.html` — el pico y la cicatriz que no queda.** En el segundo 25 el panel de usuarios da un salto vertical de 2 a 15 y el de RPS salta con él, de 1.1 a 9.5. En el panel de tiempos se ve un diente pequeño —de 140 a 160 ms— que dura unos diez segundos y desaparece. En el segundo 85 los usuarios vuelven a 2 y el RPS baja en rampa, no en vertical: son las peticiones ya en vuelo terminándose. Que **no quede escalón** en la línea de latencia después del pico es lo que indica que no hubo cola acumulada ni conexiones agotadas.
+**`soak.html` (1-nov) — tres líneas planas, y eso es la noticia.** Usuarios en 3, RPS en ~1.8, mediana y p95 pegadas en 98 y 140 ms durante los cuatro minutos. Comparada con la de octubre vale por sí sola: **la caída no se reprodujo**.
 
-**`soak.html` — la gráfica que delata la caída.** Es la única con forma interesante y hay que leer los tres paneles juntos (captura en `evidencias/capturas/04_soak_graficas_caida_de_la_instancia.jpg`).
+**`soak.html` (30-oct) — la gráfica que delata la caída.** La única con forma interesante, y hay que leer los tres paneles juntos (captura en `evidencias/2026-10-30/capturas/04_soak_graficas_caida_de_la_instancia.jpg`). El panel de usuarios es una recta en 3 de principio a fin: **la carga nunca varió**, lo que descarta de entrada que el cambio venga del cliente. El de RPS va plano en ~1.9 durante 170 segundos y **se desploma a cero**; la línea de fallos, pegada al eje toda la prueba, despega **30 segundos más tarde**. Ese desfase es la clave, y lo explica el tercer panel: los tiempos, que iban en 100 y 140 ms, **saltan a 13 000-17 000 ms**. Las peticiones no fallaron: **se quedaron colgadas** hasta agotar el límite de 15 s. El RPS cayó a cero porque los tres usuarios estaban los tres esperando, y los fallos aparecieron cuando vencieron esos plazos.
 
-El panel de usuarios es una línea recta en 3 de principio a fin: **la carga nunca varió**, lo que descarta de entrada que el cambio venga del cliente. El de RPS va plano en ~1.9 durante 170 segundos y entonces **se desploma a cero** a las 15:51:00; la línea roja de fallos por segundo, que estuvo pegada al eje toda la prueba, despega después, hacia las 15:51:30, y llega a ~2.1.
+Leer esa secuencia correctamente cambia el diagnóstico. Si fuera saturación, la latencia subiría **progresivamente** con el RPS; aquí saltó al techo de golpe, con 3 usuarios y después de haber aguantado 20. Si los procesos hubieran muerto de golpe, no habría habido cuelgue: un puerto sin nadie escuchando rechaza en milisegundos — que es justo lo que se midió horas después. **La forma de la gráfica dice que los servicios seguían vivos pero no podían avanzar, y que murieron después.**
 
-Ese desfase entre las dos líneas rojas y verdes es la clave, y se explica con el tercer panel: los tiempos de respuesta, que iban en 100 ms (mediana) y 140 ms (p95), **saltan a 13 000-17 000 ms**. Es decir, las peticiones no fallaron: **se quedaron colgadas** hasta agotar el tiempo límite de 15 segundos. El RPS cayó a cero porque los tres usuarios virtuales estaban los tres esperando a la vez, y los fallos aparecieron 30 segundos más tarde, cuando vencieron esos tiempos límite.
+**`stress.html` (30-oct) — la escalera sin consecuencias.** Siete peldaños de 2 a 20 usuarios, el RPS copiándolos hasta ~12 y el p95 inmóvil en 140 ms. La prueba visual de que, con aquel despliegue, 20 usuarios tampoco bastaban.
 
-Leer esa secuencia correctamente cambia el diagnóstico. Si fuera saturación por la carga, la latencia subiría **progresivamente** con el RPS, y aquí saltó de 140 ms al techo de golpe, con 3 usuarios y después de haber aguantado 20. Si los procesos hubieran muerto de golpe, no habría habido cuelgue: una conexión a un puerto sin nadie escuchando se rechaza en milisegundos, que es justo lo que se midió más tarde, a las 16:05. La forma de la gráfica dice que los servicios **seguían vivos pero no podían avanzar**, y que murieron después.
-
-**Qué no muestran las gráficas.** No muestran nada de la instancia: ni CPU, ni memoria, ni conexiones de PostgreSQL, ni el estado de Redis. Locust solo ve lo que ve un cliente desde fuera. Para explicar *por qué* cayeron los siete procesos hace falta mirar la máquina por dentro, y eso es justo lo que quedó pendiente.
+**Qué NO muestran las gráficas.** Nada del interior de la instancia: ni CPU, ni memoria, ni conexiones de PostgreSQL, ni el estado de Redis. Locust solo ve lo que ve un cliente desde fuera. Para explicar *por qué* cayeron los siete procesos en octubre, o *por qué* murió el monolito en noviembre, hace falta mirar la máquina por dentro — y eso es justo lo que quedó pendiente las dos veces.

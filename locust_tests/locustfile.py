@@ -6,6 +6,29 @@ Monolito web (Node/Express) contra la arquitectura de SEIS microservicios
 Flask de la Libreria en Linea, sobre la instancia de GCP.
 
 -------------------------------------------------------------------------
+0. AVISO: ESTE ARCHIVO MIDE UN DESPLIEGUE DISTINTO AL DEL 2026-10-30
+-------------------------------------------------------------------------
+La primera tanda (2026-10-30) se corrio contra unos procesos lanzados a
+mano que NO eran el codigo del repositorio. La instancia se reinicio el
+2026-11-01 y, al habilitar las unidades de systemd, lo que arranco fue el
+despliegue de `/opt/library/*`, que SI es el del repositorio. El contrato
+cambio en casi todo:
+
+    /health            antes traia "service"; ahora NO lo trae
+    /books?format=json antes envolvia en "libros"; ahora en "books"
+    filtros del catalogo  antes en espanol; ahora en INGLES
+    /authors           antes "autores"/"id_autor"; ahora "authors"/"id"
+    pedidos y pagos    antes /orders y /payments; ahora /pedidos y /pagos
+    /envios/<numero>   antes 404; ahora existe
+    /docs/ y /metrics  antes 404 y 401; ahora 200 y 200 publico
+    /session           antes 401; ahora 200 {"authenticated": false}
+
+Por eso este archivo NO es el que produjo las evidencias de octubre: las
+rutas y las aserciones se rehicieron contra el despliegue actual. La
+version de octubre se conserva en el historial de git, y sus resultados
+en RESULTADOS.md bajo su propio encabezado.
+
+-------------------------------------------------------------------------
 1. QUE MIDE ESTE ARCHIVO
 -------------------------------------------------------------------------
 Siete destinos a la vez desde UNA sola clase de usuario virtual, que
@@ -17,8 +40,8 @@ por sistema y por servicio gracias al nombre de cada peticion:
     [books]     http://<IP>:5001      catalogo de libros
     [users]     http://<IP>:5002      cuentas
     [authors]   http://<IP>:5003      autores
-    [pedidos]   http://<IP>:5004      pedidos (se identifica como "orders")
-    [pagos]     http://<IP>:5005      pagos (se identifica como "payments")
+    [pedidos]   http://<IP>:5004      pedidos
+    [pagos]     http://<IP>:5005      pagos
 
 Toda peticion lleva un nombre con el prefijo del destino entre corchetes
 (`name="[books] GET /books?format=json"`), que es lo que aparece en la
@@ -28,72 +51,82 @@ operacion -- "dame el catalogo" -- en el monolito y en el microservicio.
 -------------------------------------------------------------------------
 2. LA COMPARACION: QUE SE CONSIDERA "COMPARABLE"
 -------------------------------------------------------------------------
-El par comparable del ejercicio es el CATALOGO, porque es la unica
-operacion de negocio que los dos sistemas ofrecen sin autenticacion:
+El par comparable del ejercicio es el CATALOGO:
 
-    [monolito] GET /library/libros          -> HTML completo (~16 KB)
-    [books]    GET /books?format=json       -> JSON          (~19 KB)
+    [monolito] GET /library/catalog         -> HTML renderizado con EJS
+    [books]    GET /books?format=json       -> JSON
     [books]    GET /books?format=xml        -> XML
 
-No son identicos y conviene decirlo antes de sacar conclusiones: el
-monolito RENDERIZA una plantilla EJS (consulta + plantilla + HTML) y el
-microservicio SERIALIZA datos (consulta + JSON/XML). El monolito hace mas
-trabajo por peticion; el microservicio paga, en cambio, la red del
-cliente que luego tiene que pintar. La comparacion que si es honesta es:
-cuanto tarda y cuanto aguanta cada sistema al entregar "la lista de
-libros" por su via natural.
+y, como segundo par, el DETALLE de un libro:
 
-El segundo par comparable es el DETALLE de un libro por ISBN:
+    [monolito] GET /library/catalog/<id>    -> HTML
+    [books]    GET /books/<id>?format=json  -> JSON
 
-    [monolito] GET /library/libros/<ISBN>   -> HTML
-    [books]    GET /books/<ISBN>?format=json
+OJO -- UNA DIFERENCIA QUE HAY QUE TENER PRESENTE. En esta version del
+monolito el catalogo EXIGE SESION (`requireLogin`): sin cookie responde
+302 al formulario de login. Hay dos modos, y el `.log` de cada corrida
+dice en cual se ejecuto:
+
+  * SIN credenciales (por omision): las tareas del catalogo comprueban
+    el 302. Eso mide enrutado + comprobacion de sesion, NO la consulta
+    ni el renderizado, de modo que el par comparable NO es valido y la
+    unica lectura real del monolito es la portada.
+  * CON credenciales en el entorno (MONO_EMAIL y MONO_PASSWORD): cada
+    usuario virtual inicia sesion una vez en `on_start` y a partir de
+    ahi el catalogo responde 200 con HTML completo. Ahi si hay par
+    comparable.
+
+Las credenciales NUNCA se escriben en este archivo: se leen del entorno
+y la cookie vive solo en memoria.
 
 -------------------------------------------------------------------------
 3. INVENTARIO DE RUTAS -- VERIFICADO EN VIVO, NO SUPUESTO
 -------------------------------------------------------------------------
-Las rutas de abajo se comprobaron una por una con curl contra la
-instancia el 2026-10-30 (codigo de estado y cuerpo). Se usa la cabecera
-`Allow` de una peticion OPTIONS para descubrir los metodos admitidos.
-Esto importa porque la version DESPLEGADA no coincide con el codigo del
-repositorio: en la instancia los recursos estan en INGLES (`/orders`,
-`/payments`, `/users`) y los filtros del catalogo en ESPANOL (`titulo`,
-`autor`, `genero`, `precio_min`...).
+Comprobado con curl contra la instancia el 2026-11-01, una por una,
+mirando codigo de estado Y cuerpo.
 
     PUBLICO (sin token) -- es con lo que se genera la carga:
-      [monolito] GET /library/                 200  portada HTML
-      [monolito] GET /library/libros           200  catalogo HTML
-      [monolito] GET /library/libros/<ISBN>    200  detalle HTML
-      [monolito] GET /library/login            200  formulario
-      [monolito] GET /library/registro         200  formulario
-      [books]    GET /books                    200  XML por omision
-      [books]    GET /books?format=json|xml    200  representacion explicita
-      [books]    GET /books/<ISBN>             200  detalle (404 si no existe)
-      [books]    GET /books?<filtros>          200  titulo/autor/genero/...
-      [authors]  GET /authors                  200  clave JSON "autores"
-      [authors]  GET /authors/<id>             200  clave JSON "id_autor"
-      LOS SEIS   GET /health?format=json       200  {"service","status","db","redis"}
+      [monolito] GET /library/                   200  portada HTML
+      [monolito] GET /library/auth/login         200  formulario
+      [monolito] GET /library/auth/register      200  formulario
+      [monolito] GET /library/catalog            302 sin sesion / 200 con ella
+      [monolito] GET /library/catalog/<id>       302 sin sesion / 200 con ella
+      [books]    GET /books                      200  XML por omision
+      [books]    GET /books?format=json|xml      200  representacion explicita
+      [books]    GET /books/<id>                 200  detalle por id
+      [books]    GET /books/isbn/<isbn>          200  detalle por ISBN
+      [books]    GET /books/search?q=            200  busqueda
+      [books]    GET /books?<filtros>            200  title/author/genre/
+                                                      year_min/year_max/
+                                                      price_min/price_max
+      [books]    GET /formats /categories /genres /authors   200
+      [authors]  GET /authors                    200  clave JSON "authors"
+      [authors]  GET /authors/<id>               200  clave JSON "id"
+      [authors]  GET /authors/<id>/books         200
+      [pedidos]  GET /envios/<numero>            404  publico, pero la base
+                                                      no tiene ningun pedido
+      LOS SEIS   GET /                           200  documento de servicio
+      LOS SEIS   GET /health?format=json         200  {"status","database",...}
+      LOS SEIS   GET /metrics                    200  XML, PUBLICO
+      [login]    GET /session?format=json        200  {"authenticated": false}
+      [login]    GET /validate-email?email=      200
 
-    EXIGE Authorization: Bearer (401 sin token) -- NO hay lectura publica:
-      [login]    GET /session                  401
-      [users]    GET /users                    401
-      [pedidos]  GET /orders                   401
-      [pagos]    GET /payments                 401
-      LOS SEIS   GET /metrics                  401
-
-    NO EXISTEN en la version desplegada (404 comprobado):
-      /docs, /openapi.json en los seis;  /envios/<numero> y /pedidos en
-      pedidos;  /pagos en pagos;  /books/search, /books/isbn/<isbn>,
-      /formats, /categories, /genres, /concepts, /cloud-concepts y
-      /soap/clasificacion en books;  /validate-email en login;
-      /health en el monolito.
+    EXIGE Authorization: Bearer (401 sin token):
+      [users]    GET /users   GET /roles         401
+      [pedidos]  GET /pedidos                    401
+      [pagos]    GET /pagos   GET /metodos       401
 
     AVISO SOBRE LOS PUERTOS. El enunciado lista "pagos 5002, pedidos
-    5003, users 5004, autores 5005". La instancia responde al contrario,
-    y no es una suposicion: cada `GET /health` dice que servicio es.
-        5002 -> {"service":"users"}     5003 -> {"service":"authors"}
-        5004 -> {"service":"orders"}    5005 -> {"service":"payments"}
-    Se usa el mapa REAL. El propio arranque de la prueba lo vuelve a
-    comprobar y avisa si algun puerto contesta con otra identidad.
+    5003, users 5004, autores 5005". La instancia responde al contrario.
+    No es una suposicion: `GET /?format=json` de cada puerto dice que
+    servicio es, y el arranque de la prueba lo vuelve a comprobar.
+        5002 -> library-users-service    5003 -> library-authors-service
+        5004 -> library-pedidos-service  5005 -> library-pagos-service
+
+    POR QUE EL ARRANQUE YA NO COMPRUEBA LA IDENTIDAD EN /health: porque
+    esta version no la publica ahi. Se comprueba en `GET /?format=json`,
+    que es donde esta. Dejar la comprobacion donde ya no hay dato habria
+    hecho fallar los siete destinos por un motivo falso.
 
 -------------------------------------------------------------------------
 4. LOS PARAMETROS, UNO POR UNO
@@ -157,6 +190,9 @@ ordenes.
     PERFIL=smoke locust --headless \
         --csv evidencias/smoke --html evidencias/smoke.html
 
+    # los seis, en orden
+    ./correr_perfiles.sh
+
     # interfaz grafica (sin PERFIL: los usuarios se ponen a mano)
     locust                       # -> http://localhost:8089
 
@@ -171,20 +207,22 @@ es lo que pide el enunciado (no se apunta a localhost).
 7. CREDENCIALES
 -------------------------------------------------------------------------
 Este archivo NO contiene contrasenas ni tokens, y no debe contenerlos.
-Las rutas autenticadas (`/users`, `/orders`, `/payments`, `/session`) se
-prueban por omision SIN token, exigiendo el 401: eso verifica la cadena
-completa de autorizacion (comprobar el Bearer y la revocacion en Redis)
-sin tocar datos y sin guardar secretos.
 
-Si se exportan LIBRARY_EMAIL y LIBRARY_PASSWORD en el entorno, el
-arranque pide un token a `POST /login` y anade lecturas autenticadas. El
-token vive solo en memoria. En la corrida que acompana a esta entrega NO
-se usaron credenciales, de modo que esas lecturas quedaron como el 401.
+  * Las rutas con Bearer (`/users`, `/pedidos`, `/pagos`, `/metodos`)
+    se prueban por omision SIN token, exigiendo el 401: eso verifica la
+    cadena completa de autorizacion -- leer la cabecera, verificar la
+    firma y consultar la revocacion en Redis -- sin tocar datos.
+  * LIBRARY_EMAIL / LIBRARY_PASSWORD: si estan en el entorno, el
+    arranque pide un token a `POST /login` y las rutas protegidas pasan
+    a probarse autenticadas. El token vive solo en memoria.
+  * MONO_EMAIL / MONO_PASSWORD: si estan en el entorno, cada usuario
+    virtual inicia sesion en el monolito y el catalogo se mide de
+    verdad (200 + HTML) en lugar de comprobar el 302.
 """
 from __future__ import annotations
 
 import os
-import time
+import random
 from collections import Counter
 
 import requests
@@ -209,13 +247,20 @@ PUERTOS = {
     "pagos": 5005,
 }
 
-# Identidad que cada microservicio declara en su /health. Se comprueba al
-# arrancar: si un puerto contesta con otro nombre, el mapa de puertos
-# cambio y las estadisticas estarian mal etiquetadas.
+# Identidad que cada microservicio declara en `GET /?format=json`. Se
+# comprueba al arrancar: si un puerto contesta con otro nombre, el mapa
+# de puertos cambio y las estadisticas estarian mal etiquetadas.
 IDENTIDAD_ESPERADA = {
-    "login": "login", "books": "books", "users": "users",
-    "authors": "authors", "pedidos": "orders", "pagos": "payments",
+    "login": "library-login-service",
+    "books": "library-books-service",
+    "users": "library-users-service",
+    "authors": "library-authors-service",
+    "pedidos": "library-pedidos-service",
+    "pagos": "library-pagos-service",
 }
+
+# El monolito vive completo bajo este prefijo (config.basePath).
+BASE_MONO = "/library"
 
 
 def base(destino: str) -> str:
@@ -235,12 +280,29 @@ PAUSA = between(1, 2)
 # la degradacion, no cortarla antes de que se vea.
 TIEMPO_LIMITE = 15
 
+# Tiempo limite del SONDEO de arranque, que es otra cosa. test_start
+# corre ANTES de que Locust cree un solo usuario y bloquea el arranque
+# mientras dura. Con los 15 s de TIEMPO_LIMITE, cuatro destinos caidos
+# suman 60 s de espera: mas que el perfil smoke entero (30 s), de modo
+# que la prueba terminaba sin haber lanzado NI UNA peticion. Paso de
+# verdad el 2026-11-01. El sondeo solo tiene que distinguir "contesta"
+# de "no contesta", y para eso 3 s sobran.
+TIEMPO_SONDEO = 3
+
 PERFIL = os.getenv("PERFIL", "").strip().lower()
 
-# ISBN reales del catalogo. Se rellenan en test_start leyendo el propio
-# servicio, para no escribir datos de prueba a mano.
-CATALOGO: dict = {"isbn": ["978-0451524935"], "autores": [1]}
+# Datos reales del catalogo. Se rellenan en test_start leyendo los
+# propios servicios, para no escribir identificadores a mano.
+# Destinos que CONTESTARON al arrancar. El enunciado pide que, si un
+# componente no inicia, se registre el error y se siga con los demas; si
+# se dejara dentro un destino caido, sus fallos se sumarian al total y
+# TODOS los perfiles saldrian "degradados" por un motivo que no es la
+# carga. Se excluyen sus tareas y queda dicho en el .log y en el informe.
+DISPONIBLES: set = set()
+
+CATALOGO: dict = {"isbn": [], "libros": [], "autores": []}
 TOKEN: dict = {"valor": None}
+MONO: dict = {"sesion": False}
 QUIEBRE: dict = {"usuarios": None, "motivo": None, "segundo": None}
 CACHE = Counter()
 
@@ -337,23 +399,53 @@ def valida_401(respuesta):
         respuesta.success()
 
 
-def valida_salud(respuesta, destino):
+def valida_404(respuesta):
+    """
+    El recurso no existe y el servicio lo dice bien.
+
+    Se usa en `/envios/<numero>`: es la UNICA ruta publica de pedidos,
+    pero la base no tiene ningun pedido, de modo que lo que se mide es
+    la busqueda en PostgreSQL que termina en 404. Queda dicho en
+    RESULTADOS.md; no se presenta como una lectura de negocio.
+    """
+    if _estado(respuesta, 404):
+        respuesta.success()
+
+
+def valida_salud(respuesta):
     """
     /health de un microservicio.
 
     200 con status ok|degraded. Un 503 es la respuesta correcta cuando
     PostgreSQL o Redis estan caidos, pero para esta prueba cuenta como
     fallo: el escenario exige que las dependencias esten en pie.
+
+    Esta version NO publica "service" en /health -- la identidad se
+    comprueba al arrancar contra `GET /?format=json`.
     """
-    datos = valida_json(respuesta, claves=("status", "service"))
+    datos = valida_json(respuesta, claves=("status", "database"))
     if datos is None:
         return
     if datos["status"] not in ("ok", "degraded"):
         respuesta.failure(f"status='{datos['status']}'")
-    elif datos["service"] != IDENTIDAD_ESPERADA[destino]:
-        respuesta.failure(f"el puerto {PUERTOS[destino]} dice ser "
-                          f"'{datos['service']}' y no "
-                          f"'{IDENTIDAD_ESPERADA[destino]}'")
+
+
+def valida_302(respuesta, destino_esperado):
+    """
+    La ruta del monolito exige sesion y redirige al formulario.
+
+    Con allow_redirects=False el 302 es la respuesta correcta. Si se
+    siguiera la redireccion, Locust registraria el 200 del formulario y
+    la prueba daria por buena una pagina que no es la pedida.
+    """
+    if not _estado(respuesta, 302):
+        return
+    destino = respuesta.headers.get("Location", "")
+    if destino_esperado not in destino:
+        respuesta.failure(f"redirige a '{destino}' y no a "
+                          f"'{destino_esperado}'")
+    else:
+        respuesta.success()
 
 
 # =====================================================================
@@ -364,78 +456,98 @@ def preparar(environment, **_kwargs):
     """
     Smoke manual automatizado, ANTES de generar carga.
 
-    Hace tres cosas, y ninguna cuenta en las estadisticas (usa
-    `requests`, no el cliente de Locust): comprueba que los siete
-    destinos responden, verifica que cada puerto es el servicio que dice
-    ser, y se trae ISBN e identificadores reales para las tareas de
-    detalle. Si un destino no responde, se avisa y la prueba SIGUE: el
-    enunciado pide registrar el fallo y continuar con lo disponible.
+    Comprueba que los siete destinos responden, verifica que cada puerto
+    es el servicio que dice ser y se trae identificadores reales para
+    las tareas de detalle. Nada de esto cuenta en las estadisticas (usa
+    `requests`, no el cliente de Locust). Si un destino no responde, se
+    avisa y la prueba SIGUE: el enunciado pide registrar el fallo y
+    continuar con lo disponible.
     """
     print(f"\n[locust] perfil={PERFIL or '(manual)'}  instancia={VM_IP}")
     print(f"[locust] umbral: p95 > {P95_UMBRAL_MS:.0f} ms  o  errores > "
           f"{ERROR_UMBRAL * 100:.0f} %")
 
     for destino, puerto in PUERTOS.items():
-        url = (f"{base(destino)}/library/" if destino == "monolito"
-               else f"{base(destino)}/health?format=json")
+        url = (f"{base(destino)}{BASE_MONO}/" if destino == "monolito"
+               else f"{base(destino)}/?format=json")
         try:
-            r = requests.get(url, timeout=TIEMPO_LIMITE)
+            r = requests.get(url, timeout=TIEMPO_SONDEO)
             etiqueta = ""
             if destino != "monolito":
                 try:
-                    cuerpo = r.json()
-                    etiqueta = f" service={cuerpo.get('service')}"
-                    if cuerpo.get("service") != IDENTIDAD_ESPERADA[destino]:
+                    declarado = r.json().get("service")
+                    etiqueta = f" service={declarado}"
+                    if declarado != IDENTIDAD_ESPERADA[destino]:
                         etiqueta += "  <-- NO COINCIDE con el mapa de puertos"
                 except ValueError:
                     etiqueta = " (respuesta no JSON)"
+            if r.status_code < 500:
+                DISPONIBLES.add(destino)
             print(f"[locust]   {destino:<9} :{puerto}  HTTP {r.status_code}{etiqueta}")
         except Exception as exc:                                  # noqa: BLE001
-            print(f"[locust]   {destino:<9} :{puerto}  NO RESPONDE -> {exc}")
+            print(f"[locust]   {destino:<9} :{puerto}  NO RESPONDE -> "
+                  f"{type(exc).__name__}")
 
-    # Datos reales para las tareas de detalle.
+    caidos = [d for d in PUERTOS if d not in DISPONIBLES]
+    if caidos:
+        UsuarioLibreria.tasks = [t for t in UsuarioLibreria.tasks
+                                 if _destino_de(t) not in caidos]
+        print(f"[locust] NO DISPONIBLES: {', '.join(caidos)}. Se excluyen sus "
+              f"tareas del reparto y la corrida sigue con "
+              f"{len(DISPONIBLES)} de {len(PUERTOS)} destinos.")
+        print("[locust] AVISO: esta corrida NO mide los destinos excluidos; "
+              "hay que decirlo al comparar con otras.")
+
+    # Identificadores reales para las tareas de detalle.
     try:
         libros = requests.get(f"{base('books')}/books",
                               params={"format": "json", "limit": 200},
-                              timeout=TIEMPO_LIMITE).json().get("libros", [])
-        isbns = [l["isbn"] for l in libros if l.get("isbn")]
-        if isbns:
-            CATALOGO["isbn"] = isbns
-            print(f"[locust] {len(isbns)} ISBN reales tomados del catalogo")
+                              timeout=TIEMPO_SONDEO).json().get("books", [])
+        CATALOGO["libros"] = [l["id"] for l in libros if l.get("id")]
+        CATALOGO["isbn"] = [l["isbn"] for l in libros if l.get("isbn")]
+        print(f"[locust] {len(CATALOGO['libros'])} libros reales tomados "
+              f"del catalogo")
     except Exception as exc:                                      # noqa: BLE001
-        print(f"[locust] AVISO: no se pudo leer el catalogo ({exc}); "
-              f"se usa el ISBN de respaldo")
+        print(f"[locust] AVISO: no se pudo leer el catalogo ({exc})")
 
     try:
         autores = requests.get(f"{base('authors')}/authors",
-                               params={"format": "json"},
-                               timeout=TIEMPO_LIMITE).json().get("autores", [])
-        ids = [a["id_autor"] for a in autores if a.get("id_autor")]
-        if ids:
-            CATALOGO["autores"] = ids
-            print(f"[locust] {len(ids)} autores reales tomados del servicio")
+                               params={"format": "json", "limit": 200},
+                               timeout=TIEMPO_SONDEO).json().get("authors", [])
+        CATALOGO["autores"] = [a["id"] for a in autores if a.get("id")]
+        print(f"[locust] {len(CATALOGO['autores'])} autores reales tomados "
+              f"del servicio")
     except Exception as exc:                                      # noqa: BLE001
         print(f"[locust] AVISO: no se pudo leer autores ({exc})")
 
-    # Autenticacion OPCIONAL, solo si el entorno trae credenciales. El
-    # archivo entregado no guarda ninguna.
+    # Autenticacion OPCIONAL de la API, solo si el entorno trae
+    # credenciales. El archivo entregado no guarda ninguna.
     correo = os.getenv("LIBRARY_EMAIL")
     clave = os.getenv("LIBRARY_PASSWORD")
     if correo and clave:
         try:
             r = requests.post(f"{base('login')}/login", params={"format": "json"},
                               json={"email": correo, "password": clave},
-                              timeout=TIEMPO_LIMITE)
+                              timeout=TIEMPO_SONDEO)
             cuerpo = r.json() if r.ok else {}
             TOKEN["valor"] = (cuerpo.get("token") or cuerpo.get("access_token")
                               or cuerpo.get("accessToken"))
-            print(f"[locust] login: HTTP {r.status_code}, token "
+            print(f"[locust] login API: HTTP {r.status_code}, token "
                   f"{'obtenido' if TOKEN['valor'] else 'NO encontrado en la respuesta'}")
         except Exception as exc:                                  # noqa: BLE001
-            print(f"[locust] login fallido ({exc}); se sigue sin token")
+            print(f"[locust] login API fallido ({exc}); se sigue sin token")
     else:
-        print("[locust] sin credenciales en el entorno: las rutas "
-              "autenticadas se prueban exigiendo 401")
+        print("[locust] sin credenciales de API en el entorno: las rutas "
+              "con Bearer se prueban exigiendo 401")
+
+    MONO["sesion"] = bool(os.getenv("MONO_EMAIL") and os.getenv("MONO_PASSWORD")
+                          and "monolito" in DISPONIBLES)
+    if MONO["sesion"]:
+        print("[locust] monolito: hay credenciales, el catalogo se medira "
+              "CON sesion (200 + HTML completo)")
+    else:
+        print("[locust] monolito: sin credenciales, el catalogo se medira "
+              "como 302 al formulario -- el par comparable NO es valido")
     print()
 
 
@@ -454,6 +566,8 @@ def cerrar(environment, **_kwargs):
     if QUIEBRE["usuarios"]:
         print(f"[locust] punto de quiebre observado: {QUIEBRE['usuarios']} usuarios "
               f"en el segundo {QUIEBRE['segundo']} por {QUIEBRE['motivo']}")
+    elif QUIEBRE["motivo"]:
+        print(f"[locust] punto de quiebre NO medido: {QUIEBRE['motivo']}")
     if CACHE:
         suma = sum(CACHE.values())
         print("[locust] X-Cache -> " + ", ".join(
@@ -484,12 +598,24 @@ def cerrar(environment, **_kwargs):
 #
 # PESOS. El par comparable pesa lo mismo en los dos lados: el bloque del
 # monolito suma 26 y el de books suma 26. Los cuatro servicios sin
-# lectura publica pesan 5 cada uno, porque solo tienen /health, la ruta
-# protegida y /metrics.
+# lectura publica de datos pesan 5 cada uno.
 # =====================================================================
-def _elige(secuencia):
-    import random
-    return random.choice(secuencia)
+def _elige(secuencia, por_omision=None):
+    return random.choice(secuencia) if secuencia else por_omision
+
+
+# Cada tarea se llama <prefijo>_<lo que hace>, y el prefijo dice a que
+# destino va. Es lo que permite retirar del reparto, en bloque, las
+# tareas de un destino que no respondio al arrancar.
+PREFIJO_DESTINO = {
+    "mono": "monolito", "books": "books", "authors": "authors",
+    "login": "login", "users": "users", "pedidos": "pedidos",
+    "pagos": "pagos",
+}
+
+
+def _destino_de(tarea):
+    return PREFIJO_DESTINO.get(getattr(tarea, "__name__", "").split("_")[0])
 
 
 class UsuarioLibreria(HttpUser):
@@ -499,9 +625,36 @@ class UsuarioLibreria(HttpUser):
     host = base("monolito")        # exigido por Locust; se usan URLs absolutas
     wait_time = PAUSA
 
+    def on_start(self):
+        """
+        Inicia sesion en el monolito si hay credenciales en el entorno.
+
+        Se hace UNA vez por usuario virtual y con el cliente de Locust,
+        de modo que la cookie de sesion queda en su propio `CookieJar`
+        -- cada usuario virtual es una sesion distinta, como lo seria
+        una persona distinta. La peticion NO se mide: lleva su propio
+        nombre y pesa una sola vez en toda la corrida.
+        """
+        if not MONO["sesion"]:
+            return
+        with self.client.post(
+                f"{base('monolito')}{BASE_MONO}/auth/login",
+                data={"email": os.getenv("MONO_EMAIL"),
+                      "password": os.getenv("MONO_PASSWORD")},
+                allow_redirects=False,
+                name="[monolito] POST /library/auth/login (una vez por usuario)",
+                timeout=TIEMPO_LIMITE, catch_response=True) as r:
+            # El inicio correcto responde 302 al catalogo; un 200 es el
+            # formulario devuelto con el error, es decir, credenciales
+            # malas. Conviene que se vea y no pase por bueno.
+            if r.status_code == 302:
+                r.success()
+            else:
+                r.failure(f"no inicio sesion (HTTP {r.status_code}): "
+                          f"revise MONO_EMAIL y MONO_PASSWORD")
+
     # -----------------------------------------------------------------
-    # MONOLITO (peso total 26). Solo lecturas publicas: no se envia
-    # ningun formulario, de modo que la prueba no crea cuentas.
+    # MONOLITO :3000 (peso total 26) -- un lado del par comparable
     #
     # Todas van con allow_redirects=False a proposito: las rutas
     # protegidas del monolito no devuelven 401, devuelven un 302 al
@@ -512,85 +665,101 @@ class UsuarioLibreria(HttpUser):
     @task(10)
     def mono_catalogo(self):
         """
-        GET /library/libros -- PAR COMPARABLE con [books] GET /books.
+        GET /library/catalog -- PAR COMPARABLE con [books] GET /books.
 
-        La peticion mas pesada del monolito: consulta + plantilla EJS +
-        ~16.7 KB de HTML. El marcador `tarjeta-libro` es la clase CSS de
-        cada libro de la rejilla: si falta, la pagina llego sin libros.
+        La peticion mas pesada del monolito: seis consultas en paralelo
+        + plantilla EJS + HTML. El marcador `book-card` es la clase CSS
+        de cada libro de la rejilla: si falta, la pagina llego sin
+        libros.
         """
-        with self.client.get(f"{base('monolito')}/library/libros",
-                             allow_redirects=False,
-                             name="[monolito] GET /library/libros (catalogo HTML)",
+        nombre = ("[monolito] GET /library/catalog (catalogo HTML)"
+                  if MONO["sesion"]
+                  else "[monolito] GET /library/catalog [302 esperado]")
+        with self.client.get(f"{base('monolito')}{BASE_MONO}/catalog",
+                             allow_redirects=False, name=nombre,
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            valida_html(r, "tarjeta-libro")
+            if MONO["sesion"]:
+                valida_html(r, "book-card")
+            else:
+                valida_302(r, "/auth/login")
 
     @task(6)
     def mono_detalle(self):
-        """
-        GET /library/libros/<ISBN> -- PAR COMPARABLE con [books] GET /books/<ISBN>.
-
-        El monolito desplegado resuelve el detalle por ISBN; un id
-        numerico devuelve 302 al catalogo.
-        """
-        isbn = _elige(CATALOGO["isbn"])
-        with self.client.get(f"{base('monolito')}/library/libros/{isbn}",
-                             allow_redirects=False,
-                             name="[monolito] GET /library/libros/<ISBN> (detalle HTML)",
+        """GET /library/catalog/<id> -- PAR COMPARABLE con [books] GET /books/<id>."""
+        ident = _elige(CATALOGO["libros"], 1)
+        nombre = ("[monolito] GET /library/catalog/<id> (detalle HTML)"
+                  if MONO["sesion"]
+                  else "[monolito] GET /library/catalog/<id> [302 esperado]")
+        with self.client.get(f"{base('monolito')}{BASE_MONO}/catalog/{ident}",
+                             allow_redirects=False, name=nombre,
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            valida_html(r, isbn)
+            if not MONO["sesion"]:
+                valida_302(r, "/auth/login")
+            elif r.status_code in (302, 404):
+                r.success()          # el libro se dio de baja durante la corrida
+            else:
+                valida_html(r, "<html")
 
     @task(4)
     def mono_busqueda(self):
         """
-        GET /library/libros?q= -- PAR COMPARABLE con [books] GET /books?<filtros>.
+        GET /library/catalog?q= -- PAR COMPARABLE con [books] GET /books?<filtros>.
 
         Busca con ILIKE en PostgreSQL. Es el lado monolito de la
         consulta que no puede venir de cache.
-
-        Los terminos estan elegidos a mano porque este `q` busca por
-        TITULO o ISBN, no por autor ni por genero: se comprobo con curl
-        que "orwell", "novela" o "historia" devuelven CERO resultados y
-        una pagina sin tarjetas, lo que hacia fallar la asercion sin que
-        el servicio tuviera nada malo. Los de abajo devuelven filas, de
-        modo que la asercion sigue siendo exigente -- comprueba que de
-        verdad llegaron libros -- en lugar de aflojarse para no fallar.
         """
-        with self.client.get(f"{base('monolito')}/library/libros",
-                             params={"q": _elige(["1984", "el", "la",
-                                                  "rayuela", "cien"])},
-                             allow_redirects=False,
-                             name="[monolito] GET /library/libros?q= (busqueda HTML)",
+        nombre = ("[monolito] GET /library/catalog?q= (busqueda HTML)"
+                  if MONO["sesion"]
+                  else "[monolito] GET /library/catalog?q= [302 esperado]")
+        with self.client.get(f"{base('monolito')}{BASE_MONO}/catalog",
+                             params={"q": _elige(["base", "software", "el",
+                                                  "la", "sistemas"])},
+                             allow_redirects=False, name=nombre,
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            valida_html(r, "tarjeta-libro")
+            if MONO["sesion"]:
+                valida_html(r, "<html")
+            else:
+                valida_302(r, "/auth/login")
 
     @task(4)
     def mono_portada(self):
         """
         GET /library/ -- la portada.
 
-        Hace de sustituto del /health que el monolito NO tiene: la
-        peticion mas barata que sigue tocando la base. Con la barra
+        Hace de sustituto del /health que el monolito NO tiene: consulta
+        la vista de totales del catalogo y renderiza. Con la barra
         final, porque /library sin barra responde 301.
+
+        Con sesion iniciada la portada REDIRIGE al catalogo (lo hace el
+        propio controlador), de modo que ahi el 302 es lo correcto.
         """
-        with self.client.get(f"{base('monolito')}/library/",
+        with self.client.get(f"{base('monolito')}{BASE_MONO}/",
                              allow_redirects=False,
                              name="[monolito] GET /library/ (portada)",
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            valida_html(r, "<html")
+            if MONO["sesion"] and r.status_code == 302:
+                r.success()
+            else:
+                valida_html(r, "<html")
 
     @task(2)
     def mono_formulario(self):
         """
-        GET /library/login -- pagina publica. NO se envian credenciales.
+        GET /library/auth/register -- pagina publica. NO se envia nada.
 
-        Linea base del monolito: renderiza una plantilla SIN consultar la
-        base, de modo que separa el coste de Express+EJS del de PostgreSQL.
+        Linea base del monolito: renderiza una plantilla SIN consultar
+        la base, de modo que separa el coste de Express+EJS del de
+        PostgreSQL. Se usa el registro y no el login porque, con sesion
+        iniciada, `requireGuest` redirige el de login.
         """
-        with self.client.get(f"{base('monolito')}/library/login",
+        with self.client.get(f"{base('monolito')}{BASE_MONO}/auth/register",
                              allow_redirects=False,
-                             name="[monolito] GET /library/login (formulario)",
+                             name="[monolito] GET /library/auth/register (formulario)",
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            valida_html(r, "<form")
+            if MONO["sesion"] and r.status_code == 302:
+                r.success()
+            else:
+                valida_html(r, "<form")
 
     # -----------------------------------------------------------------
     # BOOKS :5001 (peso total 26) -- el otro lado del par comparable
@@ -601,48 +770,54 @@ class UsuarioLibreria(HttpUser):
         with self.client.get(f"{base('books')}/books", params={"format": "json"},
                              name="[books] GET /books?format=json (catalogo)",
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            datos = valida_json(r, claves=("count", "total", "libros"))
-            if datos is not None and len(datos["libros"]) != datos["count"]:
+            datos = valida_json(r, claves=("count", "total", "books"))
+            if datos is not None and len(datos["books"]) != datos["count"]:
                 r.failure(f"count={datos['count']} pero llegaron "
-                          f"{len(datos['libros'])} libros")
+                          f"{len(datos['books'])} libros")
 
     @task(6)
     def books_detalle(self):
-        """GET /books/<ISBN>?format=json -- PAR COMPARABLE con el detalle del monolito."""
-        isbn = _elige(CATALOGO["isbn"])
-        with self.client.get(f"{base('books')}/books/{isbn}",
+        """GET /books/<id>?format=json -- PAR COMPARABLE con el detalle del monolito."""
+        ident = _elige(CATALOGO["libros"], 1)
+        with self.client.get(f"{base('books')}/books/{ident}",
                              params={"format": "json"},
-                             name="[books] GET /books/<ISBN>?format=json (detalle)",
+                             name="[books] GET /books/<id>?format=json (detalle)",
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
             if r.status_code == 404:
                 r.success()      # el libro se dio de baja durante la corrida
                 return
-            datos = valida_json(r, claves=("isbn", "title"))
-            if datos is not None and datos["isbn"] != isbn:
-                r.failure(f"se pidio {isbn} y contesto {datos['isbn']}")
+            datos = valida_json(r, claves=("book",))
+            if datos is not None and datos["book"].get("id") != ident:
+                r.failure(f"se pidio el libro {ident} y contesto "
+                          f"{datos['book'].get('id')}")
 
     @task(4)
     def books_busqueda(self):
         """
         GET /books?<filtros> -- PAR COMPARABLE con la busqueda del monolito.
 
-        Filtros en espanol (asi los expone la version desplegada). Cada
-        combinacion es una clave de cache distinta, de modo que casi
-        siempre es MISS y va a PostgreSQL: comparada con el catalogo
-        completo (casi siempre HIT) mide lo que aporta Redis.
+        Filtros en INGLES: asi los expone esta version (se comprobo con
+        curl que `titulo=`, `autor=` o `genero=` se IGNORAN en silencio
+        -- devuelven el catalogo entero y `filters` vacio --, que es
+        peor que un error porque la asercion pasaria midiendo otra
+        cosa). Cada combinacion es una clave de cache distinta, de modo
+        que casi siempre es MISS y va a PostgreSQL: comparada con el
+        catalogo completo (casi siempre HIT) mide lo que aporta Redis.
         """
         filtros = dict(_elige([
-            {"titulo": "el"}, {"autor": "Orwell"}, {"genero": "Novela"},
-            {"formato": "Tapa dura"}, {"precio_min": "200"},
-            {"anio_min": "1900", "anio_max": "1980"}, {"stock_min": "5"},
+            {"genre": "Novela"}, {"year_min": "1990"}, {"price_max": "500"},
+            {"title": "sistemas"}, {"author": "Martin"},
+            {"year_min": "1900", "year_max": "1980"}, {"price_min": "200"},
         ]))
         filtros["format"] = "json"
         with self.client.get(f"{base('books')}/books", params=filtros,
                              name="[books] GET /books?<filtros> (busqueda)",
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            datos = valida_json(r, claves=("count", "total", "libros"))
+            datos = valida_json(r, claves=("count", "total", "books", "filters"))
             if datos is not None and datos["count"] > datos["total"]:
                 r.failure(f"count={datos['count']} > total={datos['total']}")
+            elif datos is not None and not datos["filters"]:
+                r.failure("el servicio ignoro los filtros: 'filters' vino vacio")
 
     @task(4)
     def books_catalogo_xml(self):
@@ -657,24 +832,24 @@ class UsuarioLibreria(HttpUser):
         with self.client.get(f"{base('books')}/health", params={"format": "json"},
                              name="[books] GET /health",
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            valida_salud(r, "books")
+            valida_salud(r)
 
     # -----------------------------------------------------------------
     # AUTHORS :5003 (peso total 14) -- la otra lectura publica real
     # -----------------------------------------------------------------
     @task(6)
     def authors_listado(self):
-        """GET /authors?format=json -- coleccion bajo la clave 'autores'."""
+        """GET /authors?format=json -- coleccion bajo la clave 'authors'."""
         with self.client.get(f"{base('authors')}/authors",
                              params={"format": "json"},
                              name="[authors] GET /authors?format=json (listado)",
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            valida_json(r, claves=("autores",))
+            valida_json(r, claves=("authors", "count", "total"))
 
     @task(4)
     def authors_detalle(self):
         """GET /authors/<id>?format=json -- el autor con sus libros."""
-        ident = _elige(CATALOGO["autores"])
+        ident = _elige(CATALOGO["autores"], 1)
         with self.client.get(f"{base('authors')}/authors/{ident}",
                              params={"format": "json"},
                              name="[authors] GET /authors/<id>?format=json (detalle)",
@@ -682,9 +857,9 @@ class UsuarioLibreria(HttpUser):
             if r.status_code == 404:
                 r.success()
                 return
-            datos = valida_json(r, claves=("id_autor",))
-            if datos is not None and datos["id_autor"] != ident:
-                r.failure(f"se pidio {ident} y contesto {datos['id_autor']}")
+            datos = valida_json(r, claves=("id", "name"))
+            if datos is not None and datos["id"] != ident:
+                r.failure(f"se pidio {ident} y contesto {datos['id']}")
 
     @task(2)
     def authors_listado_xml(self):
@@ -693,7 +868,7 @@ class UsuarioLibreria(HttpUser):
                              params={"format": "xml"},
                              name="[authors] GET /authors?format=xml (listado)",
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            valida_xml(r, "autores")
+            valida_xml(r, "authors")
 
     @task(2)
     def authors_salud(self):
@@ -701,28 +876,26 @@ class UsuarioLibreria(HttpUser):
                              params={"format": "json"},
                              name="[authors] GET /health",
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            valida_salud(r, "authors")
+            valida_salud(r)
 
     # -----------------------------------------------------------------
-    # LOS CUATRO SERVICIOS SIN LECTURA PUBLICA (peso 5 cada uno)
+    # LOS CUATRO SERVICIOS SIN LECTURA PUBLICA DE DATOS (peso 5 cada uno)
     # login :5000 · users :5002 · pedidos :5004 · pagos :5005
     #
-    # Que se mide: /health ejerce PostgreSQL y Redis, y la ruta
-    # protegida ejerce la cadena de autorizacion completa -- leer la
-    # cabecera, verificar la firma del JWT y consultar la lista de
-    # revocacion en Redis -- devolviendo 401 sin tocar datos. Es el
-    # camino caliente de estos servicios sin crear cuentas, pedidos ni
-    # cobros, que es lo que pide el enunciado al preferir lecturas que
-    # no cambien datos.
+    # Que se mide: /health ejerce PostgreSQL y Redis; la ruta protegida
+    # ejerce la cadena de autorizacion completa -- leer la cabecera,
+    # verificar la firma del JWT y consultar la revocacion en Redis --
+    # devolviendo 401 sin tocar datos; y /metrics, que en esta version
+    # es publico, ejerce el contador interno del servicio.
     #
-    # Que NO se mide: sus operaciones de negocio. Queda dicho en
-    # RESULTADOS.md como limitacion; no se disimula.
+    # Que NO se mide: sus operaciones de negocio, que son escrituras.
+    # Queda dicho en RESULTADOS.md; no se disimula.
     # -----------------------------------------------------------------
     def _salud(self, destino):
         with self.client.get(f"{base(destino)}/health", params={"format": "json"},
                              name=f"[{destino}] GET /health",
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            valida_salud(r, destino)
+            valida_salud(r)
 
     def _protegida(self, destino, ruta):
         cabeceras = ({"Authorization": f"Bearer {TOKEN['valor']}"}
@@ -742,11 +915,11 @@ class UsuarioLibreria(HttpUser):
                 valida_json(r)
 
     def _metricas(self, destino):
-        """GET /metrics -- en la version desplegada exige token: 401 esperado."""
+        """GET /metrics -- en esta version es PUBLICO y responde XML."""
         with self.client.get(f"{base(destino)}/metrics",
-                             name=f"[{destino}] GET /metrics [401 esperado]",
+                             name=f"[{destino}] GET /metrics",
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            valida_401(r)
+            valida_xml(r, "metrics")
 
     @task(2)
     def login_salud(self):
@@ -754,7 +927,18 @@ class UsuarioLibreria(HttpUser):
 
     @task(2)
     def login_session(self):
-        self._protegida("login", "/session")
+        """
+        GET /session -- en esta version responde 200 sin sesion.
+
+        Es la comprobacion de sesion del servicio de autenticacion: mira
+        la cookie, y sin ella contesta {"authenticated": false}. Ejerce
+        Redis, que es donde vive la sesion.
+        """
+        with self.client.get(f"{base('login')}/session",
+                             params={"format": "json"},
+                             name="[login] GET /session",
+                             timeout=TIEMPO_LIMITE, catch_response=True) as r:
+            valida_json(r, claves=("authenticated",))
 
     @task(1)
     def login_metricas(self):
@@ -776,9 +960,25 @@ class UsuarioLibreria(HttpUser):
     def pedidos_salud(self):
         self._salud("pedidos")
 
-    @task(2)
+    @task(1)
     def pedidos_listado(self):
-        self._protegida("pedidos", "/orders")
+        self._protegida("pedidos", "/pedidos")
+
+    @task(1)
+    def pedidos_envio(self):
+        """
+        GET /envios/<numero> -- la UNICA ruta publica de pedidos.
+
+        Es publica a proposito para que un tercero lleve la logistica.
+        En esta base no hay ningun pedido, de modo que lo que se mide es
+        la consulta a PostgreSQL que acaba en 404. No es una lectura de
+        negocio y asi queda registrado.
+        """
+        with self.client.get(f"{base('pedidos')}/envios/PED-000001",
+                             params={"format": "json"},
+                             name="[pedidos] GET /envios/<numero> [404 esperado]",
+                             timeout=TIEMPO_LIMITE, catch_response=True) as r:
+            valida_404(r)
 
     @task(1)
     def pedidos_metricas(self):
@@ -788,9 +988,13 @@ class UsuarioLibreria(HttpUser):
     def pagos_salud(self):
         self._salud("pagos")
 
-    @task(2)
+    @task(1)
     def pagos_listado(self):
-        self._protegida("pagos", "/payments")
+        self._protegida("pagos", "/pagos")
+
+    @task(1)
+    def pagos_metodos(self):
+        self._protegida("pagos", "/metodos")
 
     @task(1)
     def pagos_metricas(self):

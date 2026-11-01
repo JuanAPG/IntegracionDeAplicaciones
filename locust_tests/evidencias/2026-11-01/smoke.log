@@ -1,0 +1,292 @@
+[2026-11-01 16:59:59,424] 192/INFO/locust.main: Starting Locust 2.47.0
+[2026-11-01 16:59:59,427] 192/INFO/locust.runners: Shape test starting.
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                         0     0(0.00%) |      0       0       0      0 |    0.00        0.00
+
+[2026-11-01 16:59:59,428] 192/INFO/locust.runners: Shape worker starting
+[2026-11-01 16:59:59,428] 192/INFO/locust.runners: Shape test updating to 1 users at 1.00 spawn rate
+[2026-11-01 17:00:00,362] 192/INFO/locust.runners: Ramping to 1 users at a rate of 1.00 per second
+[2026-11-01 17:00:00,362] 192/INFO/locust.runners: All users spawned: {"UsuarioLibreria": 1} (1 total users)
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                         1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.50        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.00        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                         3     0(0.00%) |     94      93      96     95 |    0.50        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.33        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.00        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.33        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                         4     0(0.00%) |     94      93      96     95 |    0.67        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.20        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.20        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                  1     0(0.00%) |     58      58      58     58 |    0.00        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.20        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                         5     0(0.00%) |     87      58      96     95 |    0.60        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.14        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.14        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.14        0.00
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                  1     0(0.00%) |     58      58      58     58 |    0.00        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.14        0.00
+GET      [pagos] GET /metrics                                                               1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /pagos [401 esperado]                                                  1     0(0.00%) |     92      92      92     92 |    0.00        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                         7     0(0.00%) |     89      58      96     95 |    0.57        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.11        0.00
+GET      [books] GET /books?format=xml (catalogo)                                           1     0(0.00%) |    140     140     140    140 |    0.00        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.11        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.11        0.00
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                  1     0(0.00%) |     58      58      58     58 |    0.11        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.11        0.00
+GET      [pagos] GET /metrics                                                               1     0(0.00%) |     94      94      94     94 |    0.11        0.00
+GET      [pagos] GET /pagos [401 esperado]                                                  1     0(0.00%) |     92      92      92     92 |    0.00        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                         8     0(0.00%) |     95      58     140     95 |    0.67        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [authors] GET /authors?format=json (listado)                                       1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.10        0.00
+GET      [books] GET /books?format=xml (catalogo)                                           1     0(0.00%) |    140     140     140    140 |    0.00        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.10        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.10        0.00
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                  1     0(0.00%) |     58      58      58     58 |    0.10        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.10        0.00
+GET      [pagos] GET /metrics                                                               1     0(0.00%) |     94      94      94     94 |    0.10        0.00
+GET      [pagos] GET /pagos [401 esperado]                                                  1     0(0.00%) |     92      92      92     92 |    0.10        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                         9     0(0.00%) |     95      58     140     95 |    0.70        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [authors] GET /authors?format=json (listado)                                       1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+GET      [books] GET /books?format=xml (catalogo)                                           1     0(0.00%) |    140     140     140    140 |    0.10        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.10        0.00
+GET      [monolito] GET /library/ (portada)                                                 1     0(0.00%) |    102     102     102    102 |    0.00        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.10        0.00
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                  1     0(0.00%) |     58      58      58     58 |    0.10        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /metrics                                                               1     0(0.00%) |     94      94      94     94 |    0.10        0.00
+GET      [pagos] GET /pagos [401 esperado]                                                  1     0(0.00%) |     92      92      92     92 |    0.10        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                        10     0(0.00%) |     96      58     140     95 |    0.60        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [authors] GET /authors/<id>?format=json (detalle)                                  1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+GET      [authors] GET /authors?format=json (listado)                                       1     0(0.00%) |     94      94      94     94 |    0.10        0.00
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+GET      [books] GET /books?format=xml (catalogo)                                           1     0(0.00%) |    140     140     140    140 |    0.10        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.00        0.00
+GET      [monolito] GET /library/ (portada)                                                 1     0(0.00%) |    102     102     102    102 |    0.00        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.10        0.00
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                  1     0(0.00%) |     58      58      58     58 |    0.10        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /metrics                                                               1     0(0.00%) |     94      94      94     94 |    0.10        0.00
+GET      [pagos] GET /pagos [401 esperado]                                                  1     0(0.00%) |     92      92      92     92 |    0.10        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                        11     0(0.00%) |     96      58     140     95 |    0.60        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [authors] GET /authors/<id>?format=json (detalle)                                  1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+GET      [authors] GET /authors?format=json (listado)                                       1     0(0.00%) |     94      94      94     94 |    0.10        0.00
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+GET      [books] GET /books?format=xml (catalogo)                                           1     0(0.00%) |    140     140     140    140 |    0.10        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.00        0.00
+GET      [monolito] GET /library/ (portada)                                                 2     0(0.00%) |     79      55     102    100 |    0.10        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                  1     0(0.00%) |     58      58      58     58 |    0.10        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /metrics                                                               1     0(0.00%) |     94      94      94     94 |    0.10        0.00
+GET      [pagos] GET /pagos [401 esperado]                                                  1     0(0.00%) |     92      92      92     92 |    0.10        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                        12     0(0.00%) |     92      55     140     95 |    0.60        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [authors] GET /authors/<id>?format=json (detalle)                                  1     0(0.00%) |     96      96      96     96 |    0.10        0.00
+GET      [authors] GET /authors?format=json (listado)                                       1     0(0.00%) |     94      94      94     94 |    0.10        0.00
+GET      [books] GET /books/<id>?format=json (detalle)                                      1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+GET      [books] GET /books?format=xml (catalogo)                                           1     0(0.00%) |    140     140     140    140 |    0.10        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.00        0.00
+GET      [monolito] GET /library/ (portada)                                                 2     0(0.00%) |     79      55     102    100 |    0.20        0.00
+GET      [monolito] GET /library/auth/register (formulario)                                 1     0(0.00%) |     52      52      52     52 |    0.00        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                  1     0(0.00%) |     58      58      58     58 |    0.00        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /metrics                                                               1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /pagos [401 esperado]                                                  1     0(0.00%) |     92      92      92     92 |    0.00        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                        14     0(0.00%) |     90      52     140     95 |    0.50        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [authors] GET /authors/<id>?format=json (detalle)                                  1     0(0.00%) |     96      96      96     96 |    0.10        0.00
+GET      [authors] GET /authors?format=json (listado)                                       1     0(0.00%) |     94      94      94     94 |    0.10        0.00
+GET      [books] GET /books/<id>?format=json (detalle)                                      1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+GET      [books] GET /books?format=json (catalogo)                                          1     0(0.00%) |    145     145     145    145 |    0.00        0.00
+GET      [books] GET /books?format=xml (catalogo)                                           1     0(0.00%) |    140     140     140    140 |    0.10        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.00        0.00
+GET      [monolito] GET /library/ (portada)                                                 2     0(0.00%) |     79      55     102    100 |    0.20        0.00
+GET      [monolito] GET /library/auth/register (formulario)                                 1     0(0.00%) |     52      52      52     52 |    0.10        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                  1     0(0.00%) |     58      58      58     58 |    0.00        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /metrics                                                               1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /pagos [401 esperado]                                                  1     0(0.00%) |     92      92      92     92 |    0.00        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                        15     0(0.00%) |     93      52     145     95 |    0.60        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [authors] GET /authors/<id>?format=json (detalle)                                  1     0(0.00%) |     96      96      96     96 |    0.10        0.00
+GET      [authors] GET /authors?format=json (listado)                                       1     0(0.00%) |     94      94      94     94 |    0.10        0.00
+GET      [books] GET /books/<id>?format=json (detalle)                                      2     0(0.00%) |     98      96      99     99 |    0.10        0.00
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+GET      [books] GET /books?format=json (catalogo)                                          1     0(0.00%) |    145     145     145    145 |    0.00        0.00
+GET      [books] GET /books?format=xml (catalogo)                                           1     0(0.00%) |    140     140     140    140 |    0.00        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.00        0.00
+GET      [monolito] GET /library/ (portada)                                                 2     0(0.00%) |     79      55     102    100 |    0.20        0.00
+GET      [monolito] GET /library/auth/register (formulario)                                 1     0(0.00%) |     52      52      52     52 |    0.10        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                  1     0(0.00%) |     58      58      58     58 |    0.00        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /metrics                                                               1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /pagos [401 esperado]                                                  1     0(0.00%) |     92      92      92     92 |    0.00        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                        16     0(0.00%) |     94      52     145     95 |    0.60        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [authors] GET /authors/<id>?format=json (detalle)                                  1     0(0.00%) |     96      96      96     96 |    0.10        0.00
+GET      [authors] GET /authors?format=json (listado)                                       1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [books] GET /books/<id>?format=json (detalle)                                      2     0(0.00%) |     98      96      99     99 |    0.10        0.00
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+GET      [books] GET /books?format=json (catalogo)                                          1     0(0.00%) |    145     145     145    145 |    0.10        0.00
+GET      [books] GET /books?format=xml (catalogo)                                           1     0(0.00%) |    140     140     140    140 |    0.00        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.00        0.00
+GET      [monolito] GET /library/ (portada)                                                 2     0(0.00%) |     79      55     102    100 |    0.20        0.00
+GET      [monolito] GET /library/auth/register (formulario)                                 1     0(0.00%) |     52      52      52     52 |    0.10        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                  1     0(0.00%) |     58      58      58     58 |    0.00        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /metrics                                                               1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /pagos [401 esperado]                                                  1     0(0.00%) |     92      92      92     92 |    0.00        0.00
+GET      [pedidos] GET /health                                                              1     0(0.00%) |    295     295     295    295 |    0.00        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                        17     0(0.00%) |    106      52     295     95 |    0.60        0.00
+
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [authors] GET /authors/<id>?format=json (detalle)                                  1     0(0.00%) |     96      96      96     96 |    0.10        0.00
+GET      [authors] GET /authors?format=json (listado)                                       1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [books] GET /books/<id>?format=json (detalle)                                      2     0(0.00%) |     98      96      99     99 |    0.20        0.00
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.00        0.00
+GET      [books] GET /books?format=json (catalogo)                                          1     0(0.00%) |    145     145     145    145 |    0.10        0.00
+GET      [books] GET /books?format=xml (catalogo)                                           2     0(0.00%) |    138     136     140    140 |    0.00        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.00        0.00
+GET      [monolito] GET /library/ (portada)                                                 2     0(0.00%) |     79      55     102    100 |    0.10        0.00
+GET      [monolito] GET /library/auth/register (formulario)                                 1     0(0.00%) |     52      52      52     52 |    0.10        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                  1     0(0.00%) |     58      58      58     58 |    0.00        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /metrics                                                               1     0(0.00%) |     94      94      94     94 |    0.00        0.00
+GET      [pagos] GET /pagos [401 esperado]                                                  1     0(0.00%) |     92      92      92     92 |    0.00        0.00
+GET      [pedidos] GET /health                                                              1     0(0.00%) |    295     295     295    295 |    0.00        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                        18     0(0.00%) |    107      52     295     96 |    0.60        0.00
+
+[2026-11-01 17:00:29,561] 192/INFO/locust.runners: Shape test stopping
+[2026-11-01 17:00:29,579] 192/INFO/locust.main: Shape test completed, shutting down
+[2026-11-01 17:00:29,618] 192/INFO/locust.main: Shutting down (exit code 0)
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      [authors] GET /authors/<id>?format=json (detalle)                                  1     0(0.00%) |     96      96      96     96 |    0.03        0.00
+GET      [authors] GET /authors?format=json (listado)                                       1     0(0.00%) |     94      94      94     94 |    0.03        0.00
+GET      [books] GET /books/<id>?format=json (detalle)                                      2     0(0.00%) |     98      96      99     99 |    0.07        0.00
+GET      [books] GET /books?<filtros> (busqueda)                                            1     0(0.00%) |     96      96      96     96 |    0.03        0.00
+GET      [books] GET /books?format=json (catalogo)                                          1     0(0.00%) |    145     145     145    145 |    0.03        0.00
+GET      [books] GET /books?format=xml (catalogo)                                           2     0(0.00%) |    138     136     140    140 |    0.07        0.00
+GET      [books] GET /health                                                                1     0(0.00%) |     93      93      93     93 |    0.03        0.00
+GET      [monolito] GET /library/ (portada)                                                 2     0(0.00%) |     79      55     102    100 |    0.07        0.00
+GET      [monolito] GET /library/auth/register (formulario)                                 1     0(0.00%) |     52      52      52     52 |    0.03        0.00
+GET      [monolito] GET /library/catalog [302 esperado]                                     1     0(0.00%) |     94      94      94     94 |    0.03        0.00
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                  1     0(0.00%) |     58      58      58     58 |    0.03        0.00
+GET      [pagos] GET /metodos [401 esperado]                                                1     0(0.00%) |     94      94      94     94 |    0.03        0.00
+GET      [pagos] GET /metrics                                                               1     0(0.00%) |     94      94      94     94 |    0.03        0.00
+GET      [pagos] GET /pagos [401 esperado]                                                  1     0(0.00%) |     92      92      92     92 |    0.03        0.00
+GET      [pedidos] GET /health                                                              1     0(0.00%) |    295     295     295    295 |    0.03        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                        18     0(0.00%) |    107      52     295     96 |    0.61        0.00
+
+Response time percentiles (approximated)
+Type     Name                                                                                  50%    66%    75%    80%    90%    95%    98%    99%  99.9% 99.99%   100% # reqs
+--------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
+GET      [authors] GET /authors/<id>?format=json (detalle)                                      96     96     96     96     96     96     96     96     96     96     96      1
+GET      [authors] GET /authors?format=json (listado)                                           94     94     94     94     94     94     94     94     94     94     94      1
+GET      [books] GET /books/<id>?format=json (detalle)                                         100    100    100    100    100    100    100    100    100    100    100      2
+GET      [books] GET /books?<filtros> (busqueda)                                                97     97     97     97     97     97     97     97     97     97     97      1
+GET      [books] GET /books?format=json (catalogo)                                             150    150    150    150    150    150    150    150    150    150    150      1
+GET      [books] GET /books?format=xml (catalogo)                                              140    140    140    140    140    140    140    140    140    140    140      2
+GET      [books] GET /health                                                                    93     93     93     93     93     93     93     93     93     93     93      1
+GET      [monolito] GET /library/ (portada)                                                    100    100    100    100    100    100    100    100    100    100    100      2
+GET      [monolito] GET /library/auth/register (formulario)                                     53     53     53     53     53     53     53     53     53     53     53      1
+GET      [monolito] GET /library/catalog [302 esperado]                                         95     95     95     95     95     95     95     95     95     95     95      1
+GET      [monolito] GET /library/catalog?q= [302 esperado]                                      58     58     58     58     58     58     58     58     58     58     58      1
+GET      [pagos] GET /metodos [401 esperado]                                                    95     95     95     95     95     95     95     95     95     95     95      1
+GET      [pagos] GET /metrics                                                                   95     95     95     95     95     95     95     95     95     95     95      1
+GET      [pagos] GET /pagos [401 esperado]                                                      93     93     93     93     93     93     93     93     93     93     93      1
+GET      [pedidos] GET /health                                                                 300    300    300    300    300    300    300    300    300    300    300      1
+--------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
+         Aggregated                                                                             96     97    100    140    150    300    300    300    300    300    300     18
+
+
+[locust] perfil=smoke  instancia=34.51.89.203
+[locust] umbral: p95 > 1000 ms  o  errores > 5 %
+[locust]   monolito  :3000  HTTP 200
+[locust]   login     :5000  HTTP 200 service=library-login-service
+[locust]   books     :5001  HTTP 200 service=library-books-service
+[locust]   users     :5002  HTTP 200 service=library-users-service
+[locust]   authors   :5003  HTTP 200 service=library-authors-service
+[locust]   pedidos   :5004  HTTP 200 service=library-pedidos-service
+[locust]   pagos     :5005  HTTP 200 service=library-pagos-service
+[locust] 16 libros reales tomados del catalogo
+[locust] 24 autores reales tomados del servicio
+[locust] sin credenciales de API en el entorno: las rutas con Bearer se prueban exigiendo 401
+[locust] monolito: sin credenciales, el catalogo se medira como 302 al formulario -- el par comparable NO es valido
+
+
+[locust] ---- resumen de la corrida (smoke) ----
+[locust] peticiones=18  fallos=0 (0.00 %)  RPS medio=0.61
+[locust] p95 global=300 ms   mediana=96 ms
+[locust] UMBRAL: cumplido
+[locust] X-Cache -> MISS=7 (63 %), (ausente)=3 (27 %), HIT=1 (9 %)
+

@@ -1,0 +1,6 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+GET,[monolito] GET /library/catalog/<id> [302 esperado],"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",72,2026-11-01T23:03:09Z,2026-11-01T23:05:32Z
+GET,[monolito] GET /library/catalog [302 esperado],"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",164,2026-11-01T23:03:09Z,2026-11-01T23:05:32Z
+GET,[monolito] GET /library/catalog?q= [302 esperado],"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",72,2026-11-01T23:03:23Z,2026-11-01T23:05:32Z
+GET,[monolito] GET /library/auth/register (formulario),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",28,2026-11-01T23:03:14Z,2026-11-01T23:05:31Z
+GET,[monolito] GET /library/ (portada),"CatchResponseError('sin respuesta: conexion rechazada, cerrada o agotado el limite de 15 s')",50,2026-11-01T23:03:09Z,2026-11-01T23:05:30Z

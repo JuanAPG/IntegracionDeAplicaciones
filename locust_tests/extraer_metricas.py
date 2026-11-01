@@ -7,7 +7,6 @@ los escribio Locust (columnas "95%", "Requests/s", "Request Count",
 "Failure Count") para que la tabla y la evidencia no puedan discrepar.
 """
 import csv
-import glob
 import os
 import sys
 
@@ -16,8 +15,15 @@ ERROR_UMBRAL = 5.0
 PERFILES = ["smoke", "load", "stress", "spike", "soak", "quiebre"]
 
 
+# Carpeta de la tanda. Cada despliegue medido tiene la suya: la del
+# 2026-10-30 (procesos lanzados a mano, Werkzeug) y la del 2026-11-01
+# (el despliegue del repositorio, gunicorn). Se elige con RONDA.
+RONDA = os.getenv("RONDA", "2026-11-01")
+DIR = f"evidencias/{RONDA}"
+
+
 def lee(perfil):
-    ruta = f"evidencias/{perfil}_stats.csv"
+    ruta = f"{DIR}/{perfil}_stats.csv"
     if not os.path.exists(ruta):
         return None
     filas = list(csv.DictReader(open(ruta)))
@@ -60,7 +66,7 @@ def historial(perfil):
     quiebre, cuya corrida duro 13 minutos en vez de los 4 previstos por
     el defecto ya corregido del locustfile.
     """
-    ruta = f"evidencias/{perfil}_stats_history.csv"
+    ruta = f"{DIR}/{perfil}_stats_history.csv"
     if not os.path.exists(ruta):
         return None, None
     marcas, usuarios = [], []
@@ -141,13 +147,17 @@ def main():
                   f"| {veredicto(a['p95'], err, a['n'] - a['f'])} |")
 
     print("\n## El par comparable: catalogo\n")
-    print("| Perfil | [monolito] /library/libros p95 | [books] /books?format=json p95 |")
+    print("| Perfil | [monolito] catalogo p95 | [books] /books?format=json p95 |")
     print("|---|---|---|")
     for perfil in PERFILES:
         datos = lee(perfil)
         if not datos:
             continue
-        m = next((f for n, f in datos.items() if "library/libros (catalogo" in n), None)
+        # El nombre del catalogo del monolito cambio con el despliegue:
+        # "/library/libros" en la tanda 1 y "/library/catalog" en la 2.
+        m = next((f for n, f in datos.items()
+                  if "library/libros (catalogo" in n
+                  or n.startswith("[monolito] GET /library/catalog ")), None)
         b = next((f for n, f in datos.items() if "books?format=json" in n), None)
         print(f"| {perfil} | {num(m, '95%'):.0f} ms |" if m else f"| {perfil} | — |",
               f" {num(b, '95%'):.0f} ms |" if b else " — |")
