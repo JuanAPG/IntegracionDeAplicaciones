@@ -21,42 +21,36 @@ books :5001   Server: gunicorn   Connection: close
 
 Sigue cerrando. El worker síncrono de gunicorn tampoco mantiene la conexión viva, así que cada petición sigue pagando un saludo TCP completo —unos 24 ms de ida y vuelta hasta GCP—. **La causa no era "Werkzeug": era la pila Flask tal como está desplegada, con cualquiera de los dos servidores.** Me pareció importante corregirlo en vez de dejar la frase de octubre, que sonaba bien y era falsa.
 
-**En robustez, la diferencia fue del otro signo y mucho más grande.** En el `stress` del 1-nov, con la misma rampa, en la misma máquina y al mismo tiempo:
+**En robustez creí ver una diferencia enorme, y era un espejismo.** En el `stress` del 1-nov los 386 fallos fueron todos del monolito (401 peticiones, 386 fallidas) mientras los seis microservicios hacían 871 sin uno. Escribí que el monolito era el primero en caerse. **Al buscarle la causa resultó que no se cayó por la carga**: la consola serie muestra `session-39.scope: Deactivated` a las 23:03:08 UTC y el primer fallo a las 23:03:09 — systemd retiró el cgroup de mi sesión SSH y se llevó el proceso de Node con él. El log de la aplicación no tiene ni una traza de error, que es justo lo que se espera de un proceso matado desde fuera.
 
-| Destino | Peticiones | Fallos |
-|---|---|---|
-| **monolito** | 401 | **386 (96.3 %)** |
-| books | 371 | 0 |
-| authors | 210 | 0 |
-| login · pagos · pedidos · users | 290 | 0 |
-
-El monolito dejó de responder a mitad de la rampa y no volvió. Los seis microservicios terminaron sin un solo fallo.
+Así que la respuesta honesta es que **en robustez esta prueba no encontró diferencia**: ningún componente se degradó por carga en ninguna de las dos tandas. Lo que sí quedó, y es un hallazgo de despliegue y no de rendimiento, es que el monolito es el único de los siete sin unidad de systemd — por eso no sobrevivió al reinicio de la VM ni al cierre de una sesión SSH.
 
 La comparación de latencia de la tanda 2, eso sí, **no es válida**: el catálogo de este monolito exige sesión y no usé credenciales, de modo que sus tareas midieron un **302** —enrutado y comprobación de sesión— y no una consulta con su plantilla. Que aparezca con 52-96 ms frente a 140-150 ms de `books` no dice que sea más rápido: dice que se le midió menos trabajo. Prefiero decirlo así que presentar un número que favorece la conclusión fácil.
 
 ## 2. ¿Qué servicio o ruta mostró primero degradación y cómo lo determinaste?
 
-**El monolito, y con diferencia.** Lo determiné por el reparto de los fallos, no por una impresión: los 386 fallos del `stress` son **todos suyos** (`stress_failures.csv`), mientras los otros seis destinos acumulaban 871 peticiones con cero.
+**Ninguno se degradó por carga**, en ninguna de las dos tandas, y llegar a esa respuesta costó descartar dos falsos positivos.
 
-La cronología, de los `.log`:
+**El falso positivo de noviembre.** Los 386 fallos del `stress` eran todos del monolito y la conclusión se ofrecía sola: "el monolito es el primero en caerse". Antes de darla por buena fui a la causa:
 
-| Momento | Estado del monolito |
+| Hora (UTC) | Evento |
 |---|---|
-| 16:59, smoke (1 usuario) | 200, cero fallos |
-| 17:01, load (5 usuarios) | 121 peticiones, **cero fallos**, p95 100 ms |
-| 17:03:09, stress (~8-11 usuarios) | empiezan los fallos: conexión rechazada o cerrada |
-| 17:05, ya sin carga | `:3000` **rechaza al instante**; los seis microservicios siguen en 200 |
+| 22:57:49 | `Started session-39.scope — Session 39 of User jgalvann`: la sesión SSH desde la que se lanzó `npm start` |
+| **23:03:08** | **`session-39.scope: Deactivated. Consumed 1.813s CPU time, 111.1M memory peak`** |
+| **23:03:09** | **primer fallo del monolito en Locust** |
 
-**Y aquí me obligué a parar.** Que se cayera *durante* la rampa no prueba que se cayera *por* la rampa: lo lancé a mano con `npm start`, sin supervisor, y un proceso así muere igual por una señal del terminal o por una excepción no capturada. Un proceso muerto rechaza al instante, que es lo que medí, pero eso encaja con las dos explicaciones. La causa está en `/tmp/monolito.log` de la instancia y **quedó pendiente de leer**. Lo que sí es independiente de la causa: el monolito fue el único de los siete que no terminó la prueba, y el único sin unidad de systemd que lo reponga — por eso tampoco sobrevivió al reinicio de la VM, mientras los seis microservicios volvieron solos.
+Un segundo. **systemd eliminó el cgroup de la sesión y mató el proceso**; `nohup` protege de SIGHUP pero no de eso. Lo confirman dos comprobaciones más: el log de la aplicación no tiene ni una traza de error —lo propio de un proceso terminado desde fuera—, y los únicos dos avisos de falta de memoria de esa ventana son posteriores (23:11 y 23:15) y de workers de los microservicios, que siguieron sirviendo sin fallar. Además el monolito había completado el `load` entero con cero fallos cinco minutos antes.
 
-En octubre la respuesta fue distinta: **ninguno se degradó por carga**, y lo que hubo fue una caída de la instancia entera durante el soak —los siete a la vez, con 3 usuarios, cuarenta minutos después de aguantar 20—. Esa sí la diagnostiqué por tres indicios: los fallos aparecieron en siete procesos distintos a la vez; la carga era la más baja de la práctica; y el patrón fue **colgarse y después morir** (p50 y p95 saltaron de 100 y 140 ms a 13 000-17 000 ms antes de que apareciera un solo fallo). Al revisar después la consola serie de la instancia aparecieron 45 líneas de `Worker was sent SIGKILL! Perhaps out of memory?`, lo que **corrobora** el agotamiento de memoria — aunque la ventana exacta de la caída no quedó registrada en la consola, así que es respaldo, no prueba.
+**El falso positivo de octubre**, al revés: ahí sí hubo una caída real, pero de la instancia entera durante el soak —los siete componentes a la vez, con 3 usuarios, cuarenta minutos después de aguantar 20—. La diagnostiqué por tres indicios: siete procesos distintos cayendo a la vez; la carga más baja de la práctica; y el patrón de **colgarse y después morir** (p50 y p95 saltaron de 100 y 140 ms a 13 000-17 000 ms antes de que apareciera un solo fallo, y el RPS cayó a cero porque los tres usuarios estaban los tres esperando). La consola serie mostró después 45 líneas de `Worker was sent SIGKILL! Perhaps out of memory?`, lo que **corrobora** el agotamiento de memoria de la máquina — aunque la ventana exacta no quedó registrada, así que es respaldo y no prueba.
+
+**La lección de las dos.** Un fallo concentrado en un componente parece degradación de ese componente, y casi nunca lo es sin más. La pregunta "¿qué se degradó primero?" solo se puede responder después de descartar que el componente muriera por algo ajeno a la prueba — y las dos veces que la respuesta parecía evidente, la causa estaba fuera de la carga.
 
 ## 3. ¿Qué diferencias hubo entre load, stress, spike, soak y punto de quiebre?
 
 Cada perfil responde a una pregunta distinta, y en estas dos tandas se vio con claridad:
 
 - **Load** (5 usuarios, 2 min) mide el régimen esperado: 3.08 RPS y 0 % de errores. Lo importante es que **ese RPS lo impuso el cliente, no el servidor**: 5 usuarios con pausa de 1-2 s no pueden pedir más. Un load nunca mide capacidad.
-- **Stress** (2→20 por etapas) busca dónde se dobla la curva. En los microservicios no se dobló; **en el monolito no se dobló: se rompió**. La diferencia entre degradarse y caerse es justo lo que un stress sirve para distinguir.
+- **Stress** (2→20 por etapas) busca dónde se dobla la curva. No se dobló: siete escalones y el p95 inmóvil en 140 ms, con los seis microservicios a cero fallos. La conclusión útil es negativa —"20 usuarios no bastan"— y es un resultado, no un fracaso. El monolito figura con 386 fallos, pero por la muerte del proceso que se explica en la pregunta 2, no por la rampa.
 - **Spike** (2→15 de golpe y vuelta a 2) mide dos cosas que el stress no ve: el golpe y la **recuperación**. Cero errores, p95 de 140 ms, recuperación inmediata.
 - **Soak** (3 usuarios, 4 min) no busca picos sino **deriva**. En octubre fue el único que encontró algo, y precisamente porque mira el tiempo: 170 segundos planos y después la caída. En noviembre, cuatro minutos planos y cero fallos: **la caída no se reprodujo**, que es un resultado y no un no-resultado.
 - **Punto de quiebre** no es un perfil más: es **adaptativo**, sube hasta incumplir el umbral y deja de subir. En octubre no fue válido (se ejecutó contra la instancia ya caída). En noviembre **sí**: 240 s completos, hasta 20 usuarios, 12.5 RPS sostenidos, p95 clavado en 140 ms y cero fallos. **No se alcanzó el quiebre**, y eso también responde la pregunta: está por encima de 20 usuarios en estas condiciones.
@@ -69,7 +63,7 @@ En una frase: load describe lo normal, stress busca el techo, spike mide el golp
 
 **Rutas.** Solo tres de los siete destinos tienen lecturas públicas de datos. De `login`, `users`, `pedidos` y `pagos` se midieron `/health`, `/metrics` y el rechazo `401`. Y `/envios/<numero>`, la única ruta pública de pedidos, devuelve 404 siempre porque **no hay ningún pedido en la base**: lo que mide es la consulta que acaba en 404.
 
-**El monolito, mal medido.** Sin credenciales, su catálogo es un 302. La única lectura real suya es la portada. El par comparable —el núcleo de la práctica— quedó sin medir en la tanda 2.
+**El monolito, mal medido por partida doble.** Sin credenciales, su catálogo es un 302 y la única lectura real suya es la portada: el par comparable —el núcleo de la práctica— quedó sin medir. Y en el `stress` el proceso murió por el cierre de la sesión SSH, de modo que esa corrida tampoco mide su comportamiento bajo carga.
 
 **Datos.** 16 libros y 24 autores (31 y 35 en octubre). Con ese volumen PostgreSQL resuelve casi todo en memoria y Redis acierta entre el 43 % y el 55 % de las veces: se mide el camino caliente, no un catálogo grande.
 
@@ -91,13 +85,15 @@ En una frase: load describe lo normal, stress busca el techo, spike mide el golp
 - **Un defecto en el propio `locustfile.py` que descubrí ejecutando:** el sondeo de arranque usaba el límite de 15 s de las peticiones normales. Con cuatro destinos caídos eso son 60 s bloqueando el arranque — más que el perfil smoke entero (30 s), así que la prueba terminaba **sin lanzar ni una petición**. Ahora el sondeo tiene su propio límite de 3 s.
 - **Y antes, otro peor:** al evaluar el umbral con el destino caído, una excepción mataba en silencio el greenlet de la forma de carga y la prueba seguía indefinidamente — 4 minutos previstos, 13 reales. El cálculo va ahora dentro de un `try`, y si no hay ni una petición con éxito el perfil se aborta declarando "destino caído" en vez de inventar un punto de quiebre falso con 2 usuarios.
 
-**Lo que aprendí por mi cuenta.** Que una prueba de carga es, antes que nada, **una prueba de integración**: el 90 % del trabajo fue verificar qué estaba arriba, en qué puerto, con qué contrato y qué devuelve de verdad. Un `locustfile` escrito contra la documentación habría corrido sin errores y habría medido mentiras. Y una segunda lección, más incómoda: **cuando un número confirma lo que esperabas, es cuando más hay que buscarle la causa**. La ventaja del monolito encajaba con un relato razonable ("el monolito hace menos saltos"), y resultó ser un saludo TCP.
+- **Y la corrección más importante, que por poco no hago.** Con los 386 fallos del monolito delante, escribí que era el primero en degradarse bajo carga: encajaba con el relato esperable y con lo que la práctica parecía buscar. Al ir a la consola serie a buscar la causa, la respuesta fue la contraria —systemd mató el proceso al cerrarse mi sesión SSH, un segundo antes del primer fallo— y hubo que rehacer el apartado entero. **La conclusión cómoda era la falsa, y solo se cayó al pedirle evidencia.**
+
+**Lo que aprendí por mi cuenta.** Que una prueba de carga es, antes que nada, **una prueba de integración**: el 90 % del trabajo fue verificar qué estaba arriba, en qué puerto, con qué contrato y qué devuelve de verdad. Un `locustfile` escrito contra la documentación habría corrido sin errores y habría medido mentiras. Y una segunda lección, más incómoda, que esta práctica me enseñó **dos veces**: **cuando un número confirma lo que esperabas, es cuando más hay que buscarle la causa**. La ventaja de latencia del monolito encajaba con un relato razonable ("hace menos saltos") y resultó ser un saludo TCP. Los 386 fallos del monolito encajaban con otro relato razonable ("el monolito escala peor") y resultaron ser systemd cerrando un cgroup. Las dos veces el número era correcto y la explicación, inventada.
 
 ## 6. ¿Qué cambiaría en la arquitectura o en la siguiente prueba?
 
 **En la arquitectura.**
 
-1. **Dar al monolito una unidad de systemd con `Restart=always`.** Es el único de los siete sin supervisor: por eso no sobrevivió al reinicio y por eso, cuando cayó a mitad del stress, no volvió. Los seis microservicios volvieron solos.
+1. **Dar al monolito una unidad de systemd con `Restart=always`.** Es el único de los siete sin supervisor, y eso costó caro dos veces: no sobrevivió al reinicio de la VM, y murió a mitad del `stress` porque un `npm start` lanzado desde una sesión SSH vive dentro del cgroup de esa sesión. Una unidad del sistema no depende de que haya alguien conectado.
 2. **Servir los seis con un worker que mantenga la conexión viva** (gunicorn con `gthread`/`uvicorn`, o un proxy delante). Hoy, con gunicorn síncrono, cada petición paga un saludo TCP nuevo, y eso es la mitad de la latencia medida.
 3. **Dar al monolito una ruta de salud.** Es el único sin `/health`, y hay que usar la portada como sustituto, que consulta la base y no distingue "vivo" de "sano".
 4. **Alinear lo desplegado con el repositorio y dejarlo en systemd.** Que convivieran dos implementaciones distintas obligó a medir dos veces y a tirar la comparación entre tandas.
@@ -116,7 +112,7 @@ Los reportes HTML de `evidencias/2026-11-01/` y `evidencias/2026-10-30/` traen t
 
 **`quiebre.html` (1-nov) — la escalera que no se traduce en latencia.** Es la gráfica más informativa de las dos tandas (captura en `evidencias/2026-11-01/capturas/01_quiebre_graficas_rps_latencia_y_fallos.jpg`). El panel de usuarios sube en escalera recta de 1 a 20, un peldaño cada 12 segundos. El de RPS **la copia fielmente**, de ~0.6 a 12.5. Y el tercero, el de tiempos, **se queda plano**: la mediana en 95 ms y el p95 en 140 ms de principio a fin, con la línea de fallos pegada al eje. Lo que indica es que el sistema todavía está en su zona lineal: **el trabajo entra, se despacha y no se acumula**. Cuando un sistema se acerca a su límite, el p95 se despega de la mediana y empieza a trepar mientras el RPS deja de subir aunque entren más usuarios. Aquí no pasa ninguna de las dos cosas, y por eso la conclusión es "el quiebre está más arriba" y no "aguanta justo 20".
 
-**`stress.html` (1-nov) — dos sistemas en la misma gráfica** (capturas `02_stress_fallos_suben_con_la_latencia_plana.jpg` y `03_stress_los_386_fallos_son_del_monolito.jpg`). El panel de RPS sube con la escalera de usuarios hasta ~7 y luego **pierde altura**, y la línea roja de fallos despega a los 50 segundos y ya no vuelve a bajar. Pero el panel de tiempos **sigue plano en 140 ms**. Esa combinación —fallos subiendo con la latencia quieta— es la firma de un componente que **deja de aceptar conexiones** en vez de ponerse lento: una conexión rechazada se resuelve en milisegundos, de modo que no mueve el percentil, solo el contador de errores. Si el sistema estuviera saturado, la latencia subiría *antes* que los fallos. La tabla por destino confirma lo que la forma sugiere: el único que falla es el monolito.
+**`stress.html` (1-nov) — dos sistemas en la misma gráfica** (capturas `02_stress_fallos_suben_con_la_latencia_plana.jpg` y `03_stress_los_386_fallos_son_del_monolito.jpg`). El panel de RPS sube con la escalera de usuarios hasta ~7 y luego **pierde altura**, y la línea roja de fallos despega a los 50 segundos y ya no vuelve a bajar. Pero el panel de tiempos **sigue plano en 140 ms**. Esa combinación —fallos subiendo con la latencia quieta— es la firma de un componente que **deja de aceptar conexiones** en vez de ponerse lento: una conexión rechazada se resuelve en milisegundos, de modo que no mueve el percentil, solo el contador de errores. Si el sistema estuviera saturado, la latencia subiría *antes* que los fallos. **Y esa forma es justamente la que hay que saber leer**: dice "aquí hay un proceso que ya no está", no "aquí hay un sistema saturado". La causa resultó ser systemd cerrando el cgroup de la sesión SSH (pregunta 2), y la gráfica era compatible con eso desde el principio.
 
 **`soak.html` (1-nov) — tres líneas planas, y eso es la noticia.** Usuarios en 3, RPS en ~1.8, mediana y p95 pegadas en 98 y 140 ms durante los cuatro minutos. Comparada con la de octubre vale por sí sola: **la caída no se reprodujo**.
 

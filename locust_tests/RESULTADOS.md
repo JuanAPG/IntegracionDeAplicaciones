@@ -146,35 +146,41 @@ Verificados al arrancar cada corrida (el bloque aparece en todos los `.log`). La
 | **Soak** | 3 | 1/s | 4 min | 1.84 | 140 ms | 0.00 % | Latencia plana; si se repitiera la caída de octubre no sería casualidad | **Se cumple, y es un resultado importante: NO se repitió la caída.** Cuatro minutos planos, cero fallos. La caída del 30-oct no se reprodujo con este despliegue |
 | **Punto de quiebre** | 1→20, +1 cada 12 s | 1/s | 4 min | 6.54 | 140 ms | 0.00 % | No alcanzarlo | **VÁLIDO y confirmado: no se alcanzó.** Los 240 s completos, hasta 20 usuarios y 12.5 RPS sostenidos, con el p95 clavado en 140 ms y **cero fallos**. El punto de quiebre de los seis microservicios está **por encima de 20 usuarios** en estas condiciones |
 
-## Tanda 2 · El monolito fue el primero —y el único— en caerse
+## Tanda 2 · Por qué se cayó el monolito: NO fue la carga
 
-Es el hallazgo de esta tanda y conviene contarlo con precisión.
+Es el apartado que más cambió al buscarle la causa, y conviene contarlo entero porque la primera lectura era la cómoda y resultó ser falsa.
 
-**La secuencia medida**, de los `.log` y de `stress_failures.csv`:
-
-| Momento | Qué se observa |
-|---|---|
-| 16:59, smoke (1 usuario) | monolito 200, 5 peticiones, cero fallos |
-| 17:01, load (5 usuarios) | monolito 121 peticiones, **cero fallos**, p95 100 ms |
-| 17:03:09, stress (~8-11 usuarios) | empiezan los fallos: "conexión rechazada o cerrada" |
-| 17:04:24 en adelante | el monolito ya no contesta nada |
-| 17:05, sin carga | `:3000` **rechaza al instante**; los seis microservicios siguen en 200 |
-
-**El reparto de los fallos no deja lugar a dudas:**
+**Lo que se midió.** En el `stress`, los 386 fallos son **todos del monolito**:
 
 | Destino | Peticiones en `stress` | Fallos |
 |---|---|---|
 | monolito | 401 | **386** (96.3 %) |
 | books | 371 | 0 |
 | authors | 210 | 0 |
-| login | 89 | 0 |
-| pagos | 79 | 0 |
-| pedidos | 68 | 0 |
-| users | 54 | 0 |
+| login · pagos · pedidos · users | 290 | 0 |
 
-Los seis microservicios aguantaron la misma rampa, en la misma máquina y al mismo tiempo, sin un solo fallo.
+Los seis microservicios aguantaron la misma rampa, en la misma máquina y al mismo tiempo, sin un solo fallo. La conclusión que se ofrecía sola era "el monolito es el primero en degradarse bajo carga, los microservicios aguantan mejor". **Es falsa.**
 
-**Lo que esto NO permite concluir todavía.** Que el monolito se cayera *durante* la rampa no prueba que se cayera *por* la rampa. El proceso se lanzó a mano con `npm start` y sin supervisor, de modo que una señal del terminal o un fallo no capturado lo matan igual. Un proceso muerto rechaza la conexión al instante, que es exactamente lo que se midió, pero eso es compatible con las dos explicaciones. **La causa está en `/tmp/monolito.log` de la instancia y queda pendiente de leer: no se especula con ella.** Lo que sí queda medido, y es independiente de la causa, es que el monolito es el único de los siete componentes que no terminó la prueba, y que no tiene unidad de systemd que lo reponga —por eso tampoco sobrevivió al reinicio de la VM, mientras los seis microservicios volvieron solos.
+**La causa real, con la evidencia.** El log de la aplicación (`/tmp/monolito.log`) termina en su línea de arranque: ni excepción, ni traza, ni error. Un proceso que se cae por su cuenta deja algo; éste no dejó nada, lo que apunta a que lo mataron desde fuera. La consola serie de la instancia lo confirma al segundo:
+
+| Hora (UTC) | Evento |
+|---|---|
+| 22:57:49 | `Started session-39.scope - Session 39 of User jgalvann` — la sesión SSH desde la que se lanzó `npm start` |
+| **23:03:08** | **`session-39.scope: Deactivated successfully. Consumed 1.813s CPU time, 111.1M memory peak`** |
+| **23:03:09** | **primer fallo del monolito en Locust** (`stress_failures.csv`) |
+
+Un segundo de diferencia. **systemd retiró el scope de la sesión al cerrarse el SSH y se llevó por delante el proceso de Node**, que vivía dentro de ese cgroup. Los 111 MB de pico del scope son el propio Node. `nohup` protege de la señal SIGHUP, pero **no** de que systemd elimine el cgroup entero de la sesión — es el comportamiento de `systemd-logind` en esta familia de distribuciones.
+
+Dos comprobaciones que descartan las alternativas:
+
+1. **No fue falta de memoria.** Los únicos dos `SIGKILL ... Perhaps out of memory?` de esa ventana son de las **23:11 y 23:15**, posteriores a la muerte del monolito, y corresponden a workers de gunicorn de los microservicios, que siguieron respondiendo sin un fallo.
+2. **No fue la carga.** El monolito había servido el `load` entero —5 usuarios, 121 peticiones— con **cero fallos** y p95 de 100 ms, y en el `stress` solo empezó a fallar en el segundo exacto del cierre de sesión, no al subir un escalón de concurrencia.
+
+**Qué queda, entonces, como resultado honesto:**
+
+* El `stress` de la tanda 2 **no es una medición válida del monolito**: mide un proceso que fue terminado por una causa ajena a la prueba. Hay que repetirlo con el monolito bajo un supervisor.
+* **No hay ninguna evidencia de que el monolito se degrade antes que los microservicios.** Dentro de los límites de esta práctica, **ningún componente se degradó por carga** en ninguna de las dos tandas.
+* Lo que sí queda en pie, y es un hallazgo de despliegue y no de rendimiento: el monolito es el **único de los siete sin unidad de systemd**. Por eso no sobrevivió al reinicio de la VM mientras los seis microservicios volvieron solos, y por eso un `npm start` lanzado a mano muere al cerrar la sesión. La corrección es una unidad con `Restart=always`, no un cambio en la aplicación.
 
 ## Tanda 2 · Hipótesis contra resultados: qué se refutó
 
@@ -186,7 +192,9 @@ Los seis microservicios aguantaron la misma rampa, en la misma máquina y al mis
 
 4. **"Si la caída del soak se repitiera, apuntaría a la instancia." NO se repitió.** Cuatro minutos de carga sostenida con cero fallos. Aquella caída no era un defecto reproducible de la aplicación bajo esta carga.
 
-5. **La caché de Redis funciona y se nota:** entre el 43 % y el 55 % de las lecturas cacheables se sirvieron con `X-Cache: HIT` en los cinco perfiles con carga.
+5. **"El monolito será el primero en degradarse." NO SE PUDO COMPROBAR, y por poco se da por buena.** Los 386 fallos del `stress` son suyos y la conclusión se ofrecía sola. Al buscarle la causa resultó que systemd mató el proceso al cerrarse la sesión SSH, un segundo antes del primer fallo. **No hay ninguna evidencia de que el monolito se degrade antes que los microservicios**: dentro de los límites de esta práctica, ningún componente se degradó por carga en ninguna de las dos tandas.
+
+6. **La caché de Redis funciona y se nota:** entre el 43 % y el 55 % de las lecturas cacheables se sirvieron con `X-Cache: HIT` en los cinco perfiles con carga.
 
 ## Tanda 2 · Qué NO mide
 
@@ -387,9 +395,9 @@ Se registran en lugar de disimularlas.
 | **Punto de quiebre** | 2 (01-nov) | **Completada y válida** | 240 s, hasta 20 usuarios, 12.5 RPS, p95 140 ms, cero fallos. No se alcanzó el umbral: el quiebre está por encima de 20 usuarios |
 | **Soak** | 1 (30-oct) | Completada, segunda mitad inválida | Los primeros 170 s son datos buenos; el resto mide la caída de la instancia |
 | **Soak** | 2 (01-nov) | Completada | Cuatro minutos planos, cero fallos. La caída de octubre no se reprodujo |
-| **Stress** | 2 (01-nov) | **Completada, pero con el monolito caído** | Los seis microservicios dan 871 peticiones sin un fallo; los 386 fallos son todos del monolito, que dejó de responder a mitad de la rampa. Hay que repetirla con el monolito en pie |
+| **Stress** | 2 (01-nov) | **Válida para los seis microservicios; inválida para el monolito** | Los seis dan 871 peticiones sin un fallo. Los 386 fallos del monolito **no son de carga**: systemd retiró el cgroup de la sesión SSH y mató el proceso un segundo antes del primer fallo. Hay que repetirla con el monolito bajo una unidad de systemd |
 | **El par comparable del catálogo** | 2 (01-nov) | **No medido** | El catálogo del monolito exige sesión y no se usaron credenciales: se midió el 302, no la página |
-| **Causa de la caída del monolito** | 2 (01-nov) | Pendiente | Hay que leer `/tmp/monolito.log` en la instancia. No se especula: se registra el síntoma |
+| **Causa de la caída del monolito** | 2 (01-nov) | **Resuelta** | `session-39.scope: Deactivated` a las 23:03:08 UTC y primer fallo a las 23:03:09. Lo mató systemd al cerrar la sesión SSH, no la carga |
 | Operaciones de negocio de `users`, `pedidos` y `pagos` | ambas | No ejecutadas | No tienen lecturas públicas y sus operaciones son escrituras |
 
 ## Qué NO miden estas pruebas, en las dos tandas
