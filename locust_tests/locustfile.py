@@ -302,7 +302,7 @@ DISPONIBLES: set = set()
 
 CATALOGO: dict = {"isbn": [], "libros": [], "autores": []}
 TOKEN: dict = {"valor": None}
-MONO: dict = {"sesion": False}
+MONO: dict = {"sesion": False, "entrado": False}
 QUIEBRE: dict = {"usuarios": None, "motivo": None, "segundo": None}
 CACHE = Counter()
 
@@ -644,14 +644,27 @@ class UsuarioLibreria(HttpUser):
                 allow_redirects=False,
                 name="[monolito] POST /library/auth/login (una vez por usuario)",
                 timeout=TIEMPO_LIMITE, catch_response=True) as r:
-            # El inicio correcto responde 302 al catalogo; un 200 es el
-            # formulario devuelto con el error, es decir, credenciales
-            # malas. Conviene que se vea y no pase por bueno.
-            if r.status_code == 302:
-                r.success()
-            else:
+            # OJO -- ESTE MONOLITO DEVUELVE 302 EN LOS DOS CASOS. Lo que
+            # distingue el exito del fracaso es el DESTINO:
+            #     correcto  -> Location: /library/catalog  (o /admin)
+            #     fallido   -> Location: /library/auth/login
+            # Comprobar solo el codigo da por buenos los inicios de
+            # sesion fallidos, y entonces cada peticion al catalogo
+            # rebota al formulario y falla "sin motivo". Paso de verdad
+            # el 2026-11-03: 20 logins "correctos", 199 fallos del
+            # catalogo y siete minutos de corrida tirados.
+            destino = r.headers.get("Location", "")
+            if r.status_code != 302:
                 r.failure(f"no inicio sesion (HTTP {r.status_code}): "
-                          f"revise MONO_EMAIL y MONO_PASSWORD")
+                          f"el servicio no respondio con la redireccion "
+                          f"esperada")
+            elif "/auth/login" in destino:
+                r.failure("CREDENCIALES RECHAZADAS: el monolito redirige de "
+                          "vuelta al formulario. Revise MONO_EMAIL y "
+                          "MONO_PASSWORD; sin sesion el catalogo no se mide")
+            else:
+                MONO["entrado"] = True
+                r.success()
 
     # -----------------------------------------------------------------
     # MONOLITO :3000 (peso total 26) -- un lado del par comparable
@@ -695,9 +708,11 @@ class UsuarioLibreria(HttpUser):
                              timeout=TIEMPO_LIMITE, catch_response=True) as r:
             if not MONO["sesion"]:
                 valida_302(r, "/auth/login")
-            elif r.status_code in (302, 404):
+            elif r.status_code == 404:
                 r.success()          # el libro se dio de baja durante la corrida
             else:
+                # Con sesion NO se acepta un 302: seria la sesion perdida
+                # disfrazada de exito. Es el mismo descuido que arriba.
                 valida_html(r, "<html")
 
     @task(4)

@@ -73,9 +73,9 @@ Verificados al arrancar cada corrida (el bloque aparece en todos los `.log`). La
 
 | Perfil | Usuarios | Duracion | Peticiones | RPS | p95 (ms) | Errores | Umbral |
 |---|---|---|---|---|---|---|---|
-| smoke | 1 (pico medido 1) | 30 s | 18 | 0.61 | 300 | 0.00 % | cumplido |
-| load | 5 (pico medido 5) | 2 min 01 s | 372 | 3.08 | 140 | 0.00 % | cumplido |
-| stress | 2->20 (pico medido 20) | 3 min 00 s | 1272 | 7.07 | 140 | 30.35 % | DEGRADADO |
+| smoke | 1 (pico medido 1) | 31 s | 19 | 0.66 | 480 | 0.00 % | cumplido |
+| load | 5 (pico medido 5) | 2 min 00 s | 371 | 3.08 | 180 | 0.00 % | cumplido |
+| stress | 2->20 (pico medido 20) | 3 min 00 s | 1250 | 6.95 | 270 | 0.00 % | cumplido |
 | spike | 2->15->2 (pico medido 15) | 2 min 01 s | 601 | 5.01 | 140 | 0.00 % | cumplido |
 | soak | 3 (pico medido 3) | 4 min 01 s | 441 | 1.84 | 140 | 0.00 % | cumplido |
 | quiebre | 1->20 (+1/12 s) (pico medido 20) | 4 min 00 s | 1571 | 6.54 | 140 | 0.00 % | cumplido |
@@ -84,25 +84,25 @@ Verificados al arrancar cada corrida (el bloque aparece en todos los `.log`). La
 
 | Perfil | Destino | Usuarios | Duracion | Peticiones | RPS | p95 (ms) | Errores | Umbral |
 |---|---|---|---|---|---|---|---|---|
-| smoke | authors | 1 | 30 s | 2 | 0.07 | 96 (peor ruta) | 0.00 % | cumplido |
-| smoke | books | 1 | 30 s | 7 | 0.24 | 150 (peor ruta) | 0.00 % | cumplido |
-| smoke | monolito | 1 | 30 s | 5 | 0.17 | 100 (peor ruta) | 0.00 % | cumplido |
-| smoke | pagos | 1 | 30 s | 3 | 0.10 | 95 (peor ruta) | 0.00 % | cumplido |
-| smoke | pedidos | 1 | 30 s | 1 | 0.03 | 300 (peor ruta) | 0.00 % | cumplido |
-| load | authors | 5 | 2 min 01 s | 64 | 0.53 | 110 (peor ruta) | 0.00 % | cumplido |
-| load | books | 5 | 2 min 01 s | 111 | 0.92 | 180 (peor ruta) | 0.00 % | cumplido |
-| load | login | 5 | 2 min 01 s | 23 | 0.19 | 100 (peor ruta) | 0.00 % | cumplido |
-| load | monolito | 5 | 2 min 01 s | 121 | 1.00 | 100 (peor ruta) | 0.00 % | cumplido |
-| load | pagos | 5 | 2 min 01 s | 14 | 0.12 | 270 (peor ruta) | 0.00 % | cumplido |
-| load | pedidos | 5 | 2 min 01 s | 15 | 0.12 | 98 (peor ruta) | 0.00 % | cumplido |
-| load | users | 5 | 2 min 01 s | 24 | 0.20 | 230 (peor ruta) | 0.00 % | cumplido |
-| stress | authors | 2->20 | 3 min 00 s | 210 | 1.17 | 110 (peor ruta) | 0.00 % | cumplido |
-| stress | books | 2->20 | 3 min 00 s | 371 | 2.06 | 140 (peor ruta) | 0.00 % | cumplido |
-| stress | login | 2->20 | 3 min 00 s | 89 | 0.49 | 99 (peor ruta) | 0.00 % | cumplido |
-| stress | monolito | 2->20 | 3 min 00 s | 401 | 2.23 | 94 (peor ruta) | 96.26 % | DEGRADADO |
-| stress | pagos | 2->20 | 3 min 00 s | 79 | 0.44 | 100 (peor ruta) | 0.00 % | cumplido |
-| stress | pedidos | 2->20 | 3 min 00 s | 68 | 0.38 | 110 (peor ruta) | 0.00 % | cumplido |
-| stress | users | 2->20 | 3 min 00 s | 54 | 0.30 | 110 (peor ruta) | 0.00 % | cumplido |
+| smoke | authors | 1 | 31 s | 2 | 0.07 | 100 (peor ruta) | 0.00 % | cumplido |
+| smoke | books | 1 | 31 s | 7 | 0.24 | 150 (peor ruta) | 0.00 % | cumplido |
+| smoke | login | 1 | 31 s | 1 | 0.03 | 100 (peor ruta) | 0.00 % | cumplido |
+| smoke | monolito | 1 | 31 s | 8 | 0.28 | 480 (peor ruta) | 0.00 % | cumplido |
+| smoke | pagos | 1 | 31 s | 1 | 0.03 | 95 (peor ruta) | 0.00 % | cumplido |
+| load | authors | 5 | 2 min 00 s | 64 | 0.53 | 260 (peor ruta) | 0.00 % | cumplido |
+| load | books | 5 | 2 min 00 s | 101 | 0.84 | 350 (peor ruta) | 0.00 % | cumplido |
+| load | login | 5 | 2 min 00 s | 25 | 0.21 | 130 (peor ruta) | 0.00 % | cumplido |
+| load | monolito | 5 | 2 min 00 s | 133 | 1.11 | 540 (peor ruta) | 0.00 % | cumplido |
+| load | pagos | 5 | 2 min 00 s | 18 | 0.15 | 180 (peor ruta) | 0.00 % | cumplido |
+| load | pedidos | 5 | 2 min 00 s | 10 | 0.08 | 170 (peor ruta) | 0.00 % | cumplido |
+| load | users | 5 | 2 min 00 s | 20 | 0.17 | 110 (peor ruta) | 0.00 % | cumplido |
+| stress | authors | 2->20 | 3 min 00 s | 205 | 1.14 | 260 (peor ruta) | 0.00 % | cumplido |
+| stress | books | 2->20 | 3 min 00 s | 376 | 2.09 | 260 (peor ruta) | 0.00 % | cumplido |
+| stress | login | 2->20 | 3 min 00 s | 66 | 0.37 | 310 (peor ruta) | 0.00 % | cumplido |
+| stress | monolito | 2->20 | 3 min 00 s | 391 | 2.17 | 940 (peor ruta) | 0.00 % | cumplido |
+| stress | pagos | 2->20 | 3 min 00 s | 75 | 0.42 | 220 (peor ruta) | 0.00 % | cumplido |
+| stress | pedidos | 2->20 | 3 min 00 s | 75 | 0.42 | 270 (peor ruta) | 0.00 % | cumplido |
+| stress | users | 2->20 | 3 min 00 s | 62 | 0.34 | 250 (peor ruta) | 0.00 % | cumplido |
 | spike | authors | 2->15->2 | 2 min 01 s | 127 | 1.06 | 110 (peor ruta) | 0.00 % | cumplido |
 | spike | books | 2->15->2 | 2 min 01 s | 266 | 2.22 | 150 (peor ruta) | 0.00 % | cumplido |
 | spike | login | 2->15->2 | 2 min 01 s | 56 | 0.47 | 100 (peor ruta) | 0.00 % | cumplido |
@@ -126,9 +126,9 @@ Verificados al arrancar cada corrida (el bloque aparece en todos los `.log`). La
 
 | Perfil | [monolito] catalogo p95 | [books] /books?format=json p95 |
 |---|---|---|
-| smoke | 95 ms |  150 ms |
-| load | 96 ms |  140 ms |
-| stress | 52 ms |  140 ms |
+| smoke | 210 ms |  140 ms |
+| load | 210 ms |  190 ms |
+| stress | 280 ms |  260 ms |
 | spike | — |  150 ms |
 | soak | — |  150 ms |
 | quiebre | — |  140 ms |
@@ -137,72 +137,86 @@ Verificados al arrancar cada corrida (el bloque aparece en todos los `.log`). La
 
 ## Tanda 2 · Ficha por perfil: parámetros, hipótesis y conclusión
 
+> `smoke`, `load` y `stress` se repitieron el **2026-11-03** tras reparar el despliegue del monolito (ver el apartado siguiente); `spike`, `soak` y `quiebre` son del **2026-11-01**. Todos contra el mismo despliegue y el mismo `locustfile.py`.
+
 | Perfil | Usuarios | spawn_rate | Duración | RPS | p95 | Errores | Umbral | Hipótesis previa | Conclusión |
 |---|---|---|---|---|---|---|---|---|---|
-| **Smoke** | 1 | 1/s | 30 s | 0.61 | 300 ms | 0.00 % | cumplido | 0 errores, p95 < 300 ms | Se cumple. 18 peticiones, ningún fallo, y los **siete** destinos verificados con su identidad correcta en el bloque de arranque. El p95 de 300 ms es el de la primerísima petición a `pedidos` (arranque en frío del worker); la mediana fue de 96 ms |
-| **Load** | 5 | 1/s | 2 min | 3.08 | 140 ms | 0.00 % | Umbral cumplido, RPS ~3-5 impuesto por el cliente | Se cumple. 372 peticiones, cero fallos, los siete destinos dentro del umbral. El RPS es el techo que imponen 5 usuarios con pausa de 1-2 s |
-| **Stress** | 2→20 en 7 etapas | 1-2/s | 3 min | 7.07 | 140 ms | **30.35 %** | Menos degradación que en octubre gracias a los 3 workers | **Los seis microservicios la confirman; el monolito la refuta.** Los 386 fallos son **todos del monolito**, que dejó de responder a mitad de la rampa. Los seis microservicios hicieron 871 peticiones con **cero** fallos y p95 de 140 ms |
-| **Spike** | 2→15→2 | 10/s en el salto | 2 min | 5.01 | 140 ms | 0.00 % | Pico menor que en octubre | Se cumple. Cero errores y p95 de 140 ms. Sin el monolito (ya caído), **seis** destinos |
-| **Soak** | 3 | 1/s | 4 min | 1.84 | 140 ms | 0.00 % | Latencia plana; si se repitiera la caída de octubre no sería casualidad | **Se cumple, y es un resultado importante: NO se repitió la caída.** Cuatro minutos planos, cero fallos. La caída del 30-oct no se reprodujo con este despliegue |
-| **Punto de quiebre** | 1→20, +1 cada 12 s | 1/s | 4 min | 6.54 | 140 ms | 0.00 % | No alcanzarlo | **VÁLIDO y confirmado: no se alcanzó.** Los 240 s completos, hasta 20 usuarios y 12.5 RPS sostenidos, con el p95 clavado en 140 ms y **cero fallos**. El punto de quiebre de los seis microservicios está **por encima de 20 usuarios** en estas condiciones |
+| **Smoke** | 1 | 1/s | 30 s | 0.66 | 480 ms | 0.00 % | cumplido | 0 errores, p95 bajo | Se cumple. 19 peticiones, ningún fallo, los **siete** destinos verificados con su identidad. El p95 de 480 ms es la primerísima petición (arranque en frío del worker); la mediana fue de 100 ms |
+| **Load** | 5 | 1/s | 2 min | 3.08 | 180 ms | 0.00 % | Umbral cumplido, RPS ~3-5 impuesto por el cliente | Se cumple. 371 peticiones, cero fallos. El RPS es el techo que imponen 5 usuarios con pausa de 1-2 s |
+| **Stress** | 2→20 en 7 etapas | 1-2/s | 3 min | 6.95 | 270 ms | 0.00 % | Menos degradación que en octubre gracias a los 3 workers | **Confirmada.** 1250 peticiones, **cero fallos**, p95 de 270 ms — casi cuatro veces por debajo del umbral. Con 20 usuarios el sistema no se dobla |
+| **Spike** | 2→15→2 | 10/s en el salto | 2 min | 5.01 | 140 ms | 0.00 % | Pico menor que en octubre | Se cumple. Cero errores y p95 de 140 ms |
+| **Soak** | 3 | 1/s | 4 min | 1.84 | 140 ms | 0.00 % | Latencia plana; si se repitiera la caída de octubre no sería casualidad | **Se cumple, y es un resultado importante: NO se repitió la caída.** Cuatro minutos planos, cero fallos |
+| **Punto de quiebre** | 1→20, +1 cada 12 s | 1/s | 4 min | 6.54 | 140 ms | 0.00 % | No alcanzarlo | **VÁLIDO y confirmado: no se alcanzó.** Los 240 s completos, hasta 20 usuarios y 12.5 RPS sostenidos, p95 clavado en 140 ms y **cero fallos**. El punto de quiebre está **por encima de 20 usuarios** en estas condiciones |
 
-## Tanda 2 · Por qué se cayó el monolito: NO fue la carga
+## Tanda 2 · El par comparable, por fin medido
 
-Es el apartado que más cambió al buscarle la causa, y conviene contarlo entero porque la primera lectura era la cómoda y resultó ser falsa.
+Es la comparación que pide la práctica, y hasta el 2026-11-03 no se pudo hacer: el catálogo de este monolito exige sesión, y además su despliegue estaba roto (apartado siguiente). Con sesión iniciada y la base reparada, en el perfil `stress` con 20 usuarios:
 
-**Lo que se midió.** En el `stress`, los 386 fallos son **todos del monolito**:
-
-| Destino | Peticiones en `stress` | Fallos |
+| Operación | Monolito (HTML renderizado con EJS) | books (JSON) |
 |---|---|---|
-| monolito | 401 | **386** (96.3 %) |
-| books | 371 | 0 |
-| authors | 210 | 0 |
-| login · pagos · pedidos · users | 290 | 0 |
+| **Catálogo completo** | p50 **120 ms** · p95 280 ms · **21.4 KB** | p50 **140 ms** · p95 260 ms · 13.1 KB |
+| **Detalle de un libro** | p50 **64 ms** · p95 250 ms · 7.1 KB | p50 **100 ms** · p95 230 ms · 0.8 KB |
+| **Búsqueda** | p50 **69 ms** · p95 240 ms | p50 **100 ms** · p95 170 ms |
 
-Los seis microservicios aguantaron la misma rampa, en la misma máquina y al mismo tiempo, sin un solo fallo. La conclusión que se ofrecía sola era "el monolito es el primero en degradarse bajo carga, los microservicios aguantan mejor". **Es falsa.**
+**El monolito es más rápido en las tres, y sirviendo más bytes.** El catálogo entrega 21.4 KB de HTML ya renderizado contra 13.1 KB de JSON, y aun así va 20 ms por delante; en el detalle la diferencia es de 36 ms sirviendo casi diez veces más contenido.
 
-**La causa real, con la evidencia.** El log de la aplicación (`/tmp/monolito.log`) termina en su línea de arranque: ni excepción, ni traza, ni error. Un proceso que se cae por su cuenta deja algo; éste no dejó nada, lo que apunta a que lo mataron desde fuera. La consola serie de la instancia lo confirma al segundo:
+La causa se comprobó mirando las cabeceras, no suponiéndola:
+
+```
+monolito :3000   Connection: keep-alive   Keep-Alive: timeout=5
+books    :5001   Server: gunicorn         Connection: close
+```
+
+El worker síncrono de gunicorn cierra la conexión en cada respuesta, igual que hacía Werkzeug en octubre: **cada petición a un microservicio paga un saludo TCP nuevo**, y el viaje de ida y vuelta hasta la instancia es de ~24 ms. Eso explica casi exactamente la diferencia observada.
+
+**Lo que esta comparación mide de verdad, entonces, es el transporte, no la arquitectura.** El monolito gana porque reutiliza la conexión, no porque hacer todo en un proceso sea más rápido. Para comparar arquitecturas habría que servir los seis con un worker que mantenga la conexión viva; mientras no sea así, cualquier ventaja del monolito se explica por ahí.
+
+## Tanda 2 · Tres defectos del despliegue que destapó la prueba
+
+Ninguno se buscaba. Los tres aparecieron porque el `locustfile.py` valida el **cuerpo** de la respuesta y no solo el código de estado, y los tres estaban invisibles detrás de un `200`.
+
+| # | Defecto | Cómo se manifestaba | Cómo se encontró |
+|---|---|---|---|
+| 1 | **El monolito no tenía `.env`** | `POST /auth/login` devolvía **500**. PostgreSQL rechazaba al usuario: `password authentication failed for user "library_user"` (`28P01`) | La aserción de inicio de sesión falló; el `journalctl` dio la traza |
+| 2 | **La base no tenía las vistas** | `/library/catalog` devolvía **500**. El monolito lee `library.v_books_catalog`, `v_catalog_stats` y `v_book_concepts`; los seis microservicios no las usan, así que nadie lo había notado | Se aplicó `db/06_views.sql` del propio repositorio |
+| 3 | **`library_user` sin `SELECT` sobre las vistas** | La portada respondía **200 pero sin ninguna cifra**: el controlador envuelve la consulta en un `try/catch` y renderiza igual | La portada pesaba exactamente lo mismo con la base caída que con ella en pie |
+
+El tercero es el más instructivo: **el monolito estuvo sirviendo `200 OK` durante toda la primera parte de la tanda sin acceso a la base de datos.** Un `/health` —que el monolito ni siquiera tiene— no lo habría visto, y un comprobador que mire solo el código de estado lo habría dado por sano.
+
+## Tanda 2 · El incidente del monolito del 2026-11-01
+
+En la primera ejecución del `stress`, los 386 fallos fueron **todos del monolito** mientras los seis microservicios hacían 871 peticiones sin uno. La conclusión que se ofrecía sola era "el monolito es el primero en degradarse". **Es falsa**, y la evidencia es del segundo exacto:
 
 | Hora (UTC) | Evento |
 |---|---|
 | 22:57:49 | `Started session-39.scope - Session 39 of User jgalvann` — la sesión SSH desde la que se lanzó `npm start` |
-| **23:03:08** | **`session-39.scope: Deactivated successfully. Consumed 1.813s CPU time, 111.1M memory peak`** |
-| **23:03:09** | **primer fallo del monolito en Locust** (`stress_failures.csv`) |
+| **23:03:08** | **`session-39.scope: Deactivated. Consumed 1.813s CPU time, 111.1M memory peak`** |
+| **23:03:09** | **primer fallo del monolito en Locust** |
 
-Un segundo de diferencia. **systemd retiró el scope de la sesión al cerrarse el SSH y se llevó por delante el proceso de Node**, que vivía dentro de ese cgroup. Los 111 MB de pico del scope son el propio Node. `nohup` protege de la señal SIGHUP, pero **no** de que systemd elimine el cgroup entero de la sesión — es el comportamiento de `systemd-logind` en esta familia de distribuciones.
+**systemd retiró el cgroup de la sesión y mató el proceso de Node.** `nohup` protege de SIGHUP, pero no de que systemd elimine el cgroup entero de la sesión. Dos comprobaciones lo confirman: el log de la aplicación no tenía ni una traza de error —lo propio de un proceso terminado desde fuera—, y los únicos avisos de falta de memoria de esa ventana son posteriores (23:11 y 23:15) y de workers de los microservicios, que siguieron sirviendo sin fallar.
 
-Dos comprobaciones que descartan las alternativas:
+**La comprobación que lo cierra:** con el monolito bajo una unidad de systemd con `Restart=always`, la misma rampa de 20 usuarios produjo **cero fallos**. El monolito es el único de los siete sin unidad propia, y por eso tampoco sobrevivió al reinicio de la VM mientras los seis microservicios volvieron solos. Es un hallazgo de despliegue, no de rendimiento.
 
-1. **No fue falta de memoria.** Los únicos dos `SIGKILL ... Perhaps out of memory?` de esa ventana son de las **23:11 y 23:15**, posteriores a la muerte del monolito, y corresponden a workers de gunicorn de los microservicios, que siguieron respondiendo sin un fallo.
-2. **No fue la carga.** El monolito había servido el `load` entero —5 usuarios, 121 peticiones— con **cero fallos** y p95 de 100 ms, y en el `stress` solo empezó a fallar en el segundo exacto del cierre de sesión, no al subir un escalón de concurrencia.
+## Tanda 2 · Hipótesis contra resultados
 
-**Qué queda, entonces, como resultado honesto:**
+1. **"Con gunicorn y tres workers habrá menos degradación." CONFIRMADA.** El quiebre llegó a 20 usuarios y 12.5 RPS con el p95 inmóvil en 140 ms y cero fallos durante los 4 minutos completos. En octubre el `stress` con los mismos 20 usuarios ya dejaba un fallo y el quiebre no se pudo medir.
 
-* El `stress` de la tanda 2 **no es una medición válida del monolito**: mide un proceso que fue terminado por una causa ajena a la prueba. Hay que repetirlo con el monolito bajo un supervisor.
-* **No hay ninguna evidencia de que el monolito se degrade antes que los microservicios.** Dentro de los límites de esta práctica, **ningún componente se degradó por carga** en ninguna de las dos tandas.
-* Lo que sí queda en pie, y es un hallazgo de despliegue y no de rendimiento: el monolito es el **único de los siete sin unidad de systemd**. Por eso no sobrevivió al reinicio de la VM mientras los seis microservicios volvieron solos, y por eso un `npm start` lanzado a mano muere al cerrar la sesión. La corrección es una unidad con `Restart=always`, no un cambio en la aplicación.
+2. **"La ventaja del monolito no era Werkzeug sino la pila Flask desplegada." CONFIRMADA.** Con gunicorn, `books` sigue respondiendo `Connection: close`. **Esto corrige la conclusión de octubre**, que la atribuía a Werkzeug en particular.
 
-## Tanda 2 · Hipótesis contra resultados: qué se refutó
+3. **"El monolito tendrá p95 más alto que el microservicio en el catálogo." REFUTADA, y al revés de lo esperado.** Con el par comparable por fin medido, el monolito gana las tres operaciones sirviendo más bytes. La causa es el transporte, no el trabajo por petición.
 
-1. **"Con gunicorn y tres workers habrá menos degradación." CONFIRMADA en los seis microservicios.** El perfil de quiebre llegó a 20 usuarios y 12.5 RPS con el p95 inmóvil en 140 ms y cero fallos durante los 4 minutos completos. En octubre, el `stress` con los mismos 20 usuarios ya dejaba un fallo y no se pudo medir el quiebre.
+4. **"El monolito será el primero en degradarse." NO SE PUDO COMPROBAR, y por poco se da por buena.** Ver el apartado del incidente. **Ningún componente se degradó por carga** en ninguna de las dos tandas.
 
-2. **"La ventaja del monolito no era Werkzeug sino la pila Flask desplegada." CONFIRMADA.** Se comprobó mirando la cabecera, no suponiéndola: con gunicorn, `books` sigue respondiendo `Connection: close`. El worker síncrono de gunicorn tampoco mantiene la conexión viva, de modo que cada petición sigue pagando un saludo TCP. **Esto corrige la conclusión de octubre**, que atribuía la diferencia a Werkzeug en particular.
+5. **"Si la caída del soak se repitiera, apuntaría a la instancia." NO se repitió.** Cuatro minutos de carga sostenida con cero fallos.
 
-3. **"El monolito saldrá artificialmente rápido porque se le mide un 302." CONFIRMADA, y hay que insistir en ella.** En la tabla del par comparable el monolito aparece con 52-96 ms contra los 140-150 ms de `books`. **Ese número no dice que el monolito sea más rápido**: dice que se le está midiendo una redirección —enrutado más comprobación de sesión, sin consulta ni plantilla— mientras a `books` se le mide una consulta y una serialización completas. Sin credenciales, **el par comparable de esta tanda no es válido**, y así hay que leerlo.
-
-4. **"Si la caída del soak se repitiera, apuntaría a la instancia." NO se repitió.** Cuatro minutos de carga sostenida con cero fallos. Aquella caída no era un defecto reproducible de la aplicación bajo esta carga.
-
-5. **"El monolito será el primero en degradarse." NO SE PUDO COMPROBAR, y por poco se da por buena.** Los 386 fallos del `stress` son suyos y la conclusión se ofrecía sola. Al buscarle la causa resultó que systemd mató el proceso al cerrarse la sesión SSH, un segundo antes del primer fallo. **No hay ninguna evidencia de que el monolito se degrade antes que los microservicios**: dentro de los límites de esta práctica, ningún componente se degradó por carga en ninguna de las dos tandas.
-
-6. **La caché de Redis funciona y se nota:** entre el 43 % y el 55 % de las lecturas cacheables se sirvieron con `X-Cache: HIT` en los cinco perfiles con carga.
+6. **La caché de Redis funciona y se nota:** entre el 46 % y el 55 % de las lecturas cacheables se sirvieron con `X-Cache: HIT` en los perfiles con carga.
 
 ## Tanda 2 · Qué NO mide
 
-1. **El par comparable monolito-vs-microservicios**, por lo dicho en el punto 3: sin sesión, el catálogo del monolito es un 302. Para medirlo de verdad hay que exportar `MONO_EMAIL` y `MONO_PASSWORD` y repetir; el `locustfile.py` ya lo soporta y lo deja dicho en el `.log` de cada corrida.
-2. **Las operaciones de negocio de `users`, `pedidos` y `pagos`**, que son escrituras. De ellos se mide `/health` (que ejerce PostgreSQL y Redis), `/metrics` y el rechazo `401` (que ejerce la verificación del JWT contra Redis). **Su p95 bajo no significa que sean más rápidos: significa que se les mide menos trabajo.**
-3. **El rastreo público de pedidos como lectura de negocio.** `/envios/<numero>` existe, pero la base no tiene ningún pedido: los tres números probados dan 404. Lo que se mide es la consulta que termina en 404.
-4. **La capacidad máxima.** "No se alcanzó el quiebre con 20 usuarios" significa eso y nada más: con esta pausa entre tareas, cuatro minutos, desde este equipo y por Internet hasta GCP.
-5. **Ningún destino recibió los 20 usuarios.** La carga se reparte entre los destinos disponibles según los pesos, de modo que el número de usuarios del perfil es la concurrencia del **sistema completo**.
+1. **Las operaciones de negocio de `users`, `pedidos` y `pagos`**, que son escrituras. De ellos se mide `/health` (que ejerce PostgreSQL y Redis), `/metrics` y el rechazo `401` (que ejerce la verificación del JWT contra Redis). **Su p95 bajo no significa que sean más rápidos: significa que se les mide menos trabajo.**
+2. **El rastreo público de pedidos como lectura de negocio.** `/envios/<numero>` existe, pero la base no tiene ningún pedido: los tres números probados dan 404. Lo que se mide es la consulta que termina en 404.
+3. **La capacidad máxima.** "No se alcanzó el quiebre con 20 usuarios" significa eso y nada más: con esta pausa entre tareas, cuatro minutos, desde este equipo y por Internet hasta GCP.
+4. **Ningún destino recibió los 20 usuarios.** La carga se reparte entre los siete destinos según los pesos, de modo que el número de usuarios del perfil es la concurrencia del **sistema completo**.
 
 ---
 
@@ -385,20 +399,23 @@ Se registran en lugar de disimularlas.
 5. **Hubo que levantar seis de los siete componentes, y eso cambió lo que se mide.** Tras el reinicio del 2026-11-01 solo `library-login` arrancó solo. Al habilitar las unidades de systemd arrancó el despliegue de `/opt/library/*`, que **no** es el mismo código que se midió el 30-oct: de ahí que haya dos tandas y no una. El monolito, que no tiene unidad de systemd, hubo que lanzarlo a mano.
 6. **Los seis microservicios escuchaban solo en `127.0.0.1`.** Las unidades traían `--bind 127.0.0.1:<puerto>` (salvo login). Se cambiaron a `0.0.0.0` para poder medirlos desde fuera, con copia de seguridad de cada unidad. Es un cambio de despliegue, no de la aplicación, pero queda anotado porque afecta a lo que se puede medir.
 7. **Hubo que abrir los puertos 5002-5005 en el cortafuegos de GCP**, que no tenían ninguna regla (la de 5004 existía pero apuntaba al tag `library-server`, que la instancia no tiene, y a la IP de la propia VM como origen: nunca aplicó). Conviene cerrarlos al terminar.
-8. **No se usaron credenciales.** Las rutas que exigen `Authorization: Bearer` se prueban exigiendo el `401`, que ejercita la cadena de autorización completa sin tocar datos y sin guardar secretos en el archivo entregado. La consecuencia es que **el par comparable de la tanda 2 no es válido**: el catálogo del monolito exige sesión y se midió como 302. El `locustfile.py` admite credenciales por variable de entorno para medirlo de verdad.
+8. **Las rutas con `Authorization: Bearer` se prueban exigiendo el `401`**, que ejercita la cadena de autorización completa sin tocar datos y sin guardar secretos en el archivo entregado.
+9. **Para el catálogo del monolito sí hizo falta una sesión**, porque esta versión lo protege con `requireLogin`. Las credenciales se pasan por variable de entorno (`MONO_EMAIL`/`MONO_PASSWORD`), nunca se escriben en ningún archivo entregado y la cookie vive solo en memoria. El `.log` de cada corrida deja constancia de en qué modo se ejecutó.
+10. **Hubo que reparar el despliegue del monolito** antes de poder medirlo: le faltaba el `.env`, a la base le faltaban las vistas y a `library_user` los permisos sobre ellas. Está documentado en "Tres defectos del despliegue que destapó la prueba"; no se disimula como si el entorno hubiera estado listo.
 
 ## Pruebas que no se pudieron completar
 
 | Prueba | Tanda | Estado | Motivo |
 |---|---|---|---|
 | **Punto de quiebre** | 1 (30-oct) | **No completada** | Se ejecutó contra una instancia que ya no aceptaba conexiones: las 257 peticiones fallaron. Se conserva como evidencia de lo ocurrido, no como medición |
-| **Punto de quiebre** | 2 (01-nov) | **Completada y válida** | 240 s, hasta 20 usuarios, 12.5 RPS, p95 140 ms, cero fallos. No se alcanzó el umbral: el quiebre está por encima de 20 usuarios |
+| **Punto de quiebre** | 2 | **Completada y válida** | 240 s, hasta 20 usuarios, 12.5 RPS, p95 140 ms, cero fallos. No se alcanzó el umbral: el quiebre está por encima de 20 usuarios |
 | **Soak** | 1 (30-oct) | Completada, segunda mitad inválida | Los primeros 170 s son datos buenos; el resto mide la caída de la instancia |
-| **Soak** | 2 (01-nov) | Completada | Cuatro minutos planos, cero fallos. La caída de octubre no se reprodujo |
-| **Stress** | 2 (01-nov) | **Válida para los seis microservicios; inválida para el monolito** | Los seis dan 871 peticiones sin un fallo. Los 386 fallos del monolito **no son de carga**: systemd retiró el cgroup de la sesión SSH y mató el proceso un segundo antes del primer fallo. Hay que repetirla con el monolito bajo una unidad de systemd |
-| **El par comparable del catálogo** | 2 (01-nov) | **No medido** | El catálogo del monolito exige sesión y no se usaron credenciales: se midió el 302, no la página |
-| **Causa de la caída del monolito** | 2 (01-nov) | **Resuelta** | `session-39.scope: Deactivated` a las 23:03:08 UTC y primer fallo a las 23:03:09. Lo mató systemd al cerrar la sesión SSH, no la carga |
+| **Soak** | 2 | Completada | Cuatro minutos planos, cero fallos. La caída de octubre no se reprodujo |
+| **Stress** | 2 | **Completada y válida** (repetida el 03-nov) | La primera ejecución quedó invalidada por la muerte del proceso del monolito, ajena a la carga. Repetida con el monolito bajo systemd: 1250 peticiones, **cero fallos** |
+| **El par comparable del catálogo** | 2 | **Medido** (03-nov) | Requirió sesión en el monolito y reparar tres defectos de su despliegue. Ver "El par comparable, por fin medido" |
+| **El par comparable del catálogo** | 1 (30-oct) | Medido | El monolito de aquel despliegue servía el catálogo público |
 | Operaciones de negocio de `users`, `pedidos` y `pagos` | ambas | No ejecutadas | No tienen lecturas públicas y sus operaciones son escrituras |
+| Causa del colapso de la instancia del 30-oct | 1 | **Sin determinar** | La consola serie muestra 45 avisos de falta de memoria en los días próximos, lo que corrobora el agotamiento de recursos, pero la ventana exacta no quedó registrada. Se registra el síntoma, no se especula con la causa |
 
 ## Qué NO miden estas pruebas, en las dos tandas
 
