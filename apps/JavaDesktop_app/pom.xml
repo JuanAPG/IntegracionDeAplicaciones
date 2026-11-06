@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  apps/JavaDesktop_app/pom.xml
+  Cliente de escritorio JavaFX de la Libreria en Linea.
+
+  Dependencias, y por que son tan pocas:
+    * JavaFX controls/fxml  -> la interfaz grafica.
+    * JavaFX web            -> el WebView donde se embebe el mapa de
+                               Leaflet + OpenStreetMap.
+    * Jackson databind      -> JSON. Es la unica forma de intercambio
+                               con los microservicios.
+  NO hay dependencia de cliente HTTP ni de WebSocket: el JDK ya trae
+  java.net.http.HttpClient y java.net.http.WebSocket desde Java 11, y
+  son suficientes para todo lo que hace esta aplicacion. Menos
+  dependencias que auditar y nada que se quede sin mantenimiento.
+
+  NO hay driver de PostgreSQL, y es deliberado: el enunciado prohibe
+  que esta aplicacion hable con la base de datos. Todo pasa por los
+  microservicios. Si algun dia aparece un postgresql.jar en este
+  archivo, es que alguien se salto la arquitectura.
+
+  Arranque:
+      mvn clean javafx:run
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>mx.udem.library</groupId>
+  <artifactId>library-desktop</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <name>Libreria en Linea - Cliente de escritorio</name>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <javafx.version>25.0.5</javafx.version>
+    <jackson.version>2.18.2</jackson.version>
+    <main.class>mx.udem.library.desktop.App</main.class>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-controls</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-fxml</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-web</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-maven-plugin</artifactId>
+        <version>0.0.8</version>
+        <configuration>
+          <mainClass>${main.class}</mainClass>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

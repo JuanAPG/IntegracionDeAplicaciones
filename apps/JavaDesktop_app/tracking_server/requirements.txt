@@ -1,0 +1,21 @@
+# Servidor de rastreo de entregas (Flask + Flask-Sock)
+#
+#   python3 -m venv .venv
+#   source .venv/bin/activate
+#   pip install -r requirements.txt
+#   python app.py
+#
+# Flask-Sock necesita el servidor de desarrollo de Werkzeug en modo
+# threaded (o gunicorn con worker gevent); no funciona con el worker
+# sync de gunicorn, que no sabe hacer el upgrade a WebSocket.
+Flask>=3.0,<4
+flask-sock>=0.7,<1
+
+# Verificacion de la firma del JWT que emite el microservicio de login.
+# MISMO secreto HS256 que los seis servicios: sin el, este servidor no
+# puede saber quien pide un rastreo.
+PyJWT>=2.8,<3
+
+# Para preguntarle al microservicio de pedidos si quien pide el rastreo
+# es realmente el dueno del pedido.
+requests>=2.31,<3

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rastreo de entrega</title>
+
+<!--
+  tracking_server/static/mapa.html
+  El mapa de seguimiento: Leaflet + OpenStreetMap.
+
+  ESTA PAGINA NO ABRE NINGUN WEBSOCKET, y es deliberado. La conexion
+  vive en la aplicacion Java (ver TrackingSocket.java), que es lo que
+  pide el enunciado, y ademas permite poner el token en la cabecera del
+  handshake -- algo que el WebSocket de un navegador no deja hacer.
+  Java recibe los mensajes y los entrega aqui llamando a window.LIB.
+
+  La pagina se usa de dos maneras:
+    1. Dentro de un WebView de JavaFX (el caso normal).
+    2. Abierta en un navegador contra http://host:5900/mapa, para
+       comprobar el mapa sin levantar la aplicacion Java. En ese caso
+       los botones de demostracion de abajo permiten alimentarla a mano.
+-->
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root {
+    --fondo: #0f172a;
+    --panel: rgba(15, 23, 42, .88);
+    --texto: #e2e8f0;
+    --tenue: #94a3b8;
+    --acento: #38bdf8;
+    --exito: #4ade80;
+    --borde: rgba(148, 163, 184, .25);
+  }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--fondo);
+    color: var(--texto);
+  }
+  /* El contenedor necesita altura REAL o Leaflet se pinta de 0 px.
+     En un WebView sin tamano asignado esta es la causa numero uno de
+     "el mapa no aparece". */
+  #mapa { position: absolute; inset: 0; z-index: 1; background: #0b1220; }
+
+  .tarjeta {
+    position: absolute; z-index: 1000;
+    background: var(--panel);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 8px 28px rgba(0,0,0,.35);
+  }
+  #estado { top: 14px; left: 14px; min-width: 260px; max-width: 340px; }
+  #leyenda { bottom: 14px; left: 14px; font-size: 12px; color: var(--tenue); }
+
+  .codigo { font: 600 13px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+            color: var(--acento); letter-spacing: .04em; }
+  .titulo { margin: 6px 0 2px; font-size: 19px; font-weight: 650; }
+  .dato { font-size: 13px; color: var(--tenue); margin: 2px 0; }
+  .dato b { color: var(--texto); font-weight: 600; }
+
+  .barra { height: 6px; border-radius: 3px; background: rgba(148,163,184,.22);
+           margin: 10px 0 8px; overflow: hidden; }
+  .barra > i { display: block; height: 100%; width: 0;
+               background: linear-gradient(90deg, var(--acento), var(--exito));
+               transition: width .6s linear; }
+
+  .pasos { list-style: none; margin: 10px 0 0; padding: 0; font-size: 12.5px; }
+  .pasos li { display: flex; align-items: center; gap: 8px; padding: 3px 0; color: var(--tenue); }
+  .pasos li::before {
+    content: ""; width: 9px; height: 9px; border-radius: 50%;
+    background: rgba(148,163,184,.3); flex: none;
+  }
+  .pasos li.hecho { color: var(--texto); }
+  .pasos li.hecho::before { background: var(--exito); }
+  .pasos li.actual { color: var(--acento); font-weight: 650; }
+  .pasos li.actual::before { background: var(--acento); box-shadow: 0 0 0 4px rgba(56,189,248,.18); }
+
+  /* El icono del vehiculo. El rumbo gira un hijo y NO el nodo raiz:
+     Leaflet usa el transform del raiz para posicionar el marcador, y
+     rotarlo ahi lo manda a otra parte del mapa. */
+  .vehiculo { display: grid; place-items: center; }
+  .vehiculo .disco {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--acento); border: 3px solid #fff;
+    box-shadow: 0 2px 10px rgba(0,0,0,.45);
+    display: grid; place-items: center;
+    transform: rotate(var(--rot, 0deg)); transition: transform .5s linear;
+  }
+  .vehiculo.entregado .disco { background: var(--exito); }
+  .vehiculo .disco svg { width: 18px; height: 18px; fill: #0f172a; }
+  .pin { font-size: 22px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+</style>
+</head>
+<body>
+
+<div id="mapa"></div>
+
+<div class="tarjeta" id="estado">
+  <div class="codigo" id="codigo">sin rastreo</div>
+  <div class="titulo" id="titulo">Esperando datos…</div>
+  <div class="barra"><i id="progreso"></i></div>
+  <div class="dato">Destino: <b id="destino">—</b></div>
+  <div class="dato">Faltan: <b id="restante">—</b> · Llega en <b id="eta">—</b></div>
+  <ul class="pasos" id="pasos"></ul>
+</div>
+
+<div class="tarjeta" id="leyenda">
+  Ruta por calles reales (OSRM) · mosaicos de OpenStreetMap · simulación acelerada
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/*
+ * El puente con Java.
+ *
+ * Todo lo publico cuelga de window.LIB. Java llama a estas funciones con
+ * webEngine.executeScript("LIB.posicion(" + json + ")"). Nada mas sale
+ * al ambito global: si manana la pagina cambia por dentro, el contrato
+ * con Java sigue siendo estas cuatro funciones.
+ */
+(function () {
+  "use strict";
+
+  var MONTERREY = [25.6866, -100.3161];
+
+  var mapa = L.map("mapa", { preferCanvas: true, zoomControl: true })
+              .setView(MONTERREY, 12);
+
+  /*
+   * LOS HUECOS GRISES DEL MAPA.
+   *
+   * La primera version dejaba cuadros sin pintar segun avanzaba el
+   * vehiculo. No era un fallo de Leaflet: son mosaicos que el servidor
+   * de OpenStreetMap no sirvio. Dos causas, y las dos se corrigen aqui:
+   *
+   *  1. El mapa se desplazaba en CADA posicion (una por segundo), y
+   *     cada desplazamiento pide mosaicos nuevos. OSM limita las
+   *     rafagas y empieza a descartar peticiones. Ahora solo se
+   *     desplaza cuando el vehiculo se acerca al borde (ver `seguirSi`).
+   *  2. Un mosaico que falla se quedaba gris para siempre. Ahora se
+   *     reintenta una vez.
+   *
+   * `keepBuffer` alto conserva los mosaicos de alrededor al desplazar,
+   * de modo que volver atras no vuelve a pedirlos.
+   */
+  var capaMosaicos = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    // UN SOLO HOST, SIN {s}. El reparto por subdominios (a/b/c.tile)
+    // se invento para los navegadores de HTTP/1.1, que limitaban las
+    // conexiones por host. Hoy OpenStreetMap lo desaconseja, y en el
+    // WebView es contraproducente: tres hosts son tres saludos TLS y
+    // tres juegos de conexiones que no se reaprovechan.
+    //
+    // keepBuffer BAJO. Subirlo parecia buena idea -- conservar mosaicos
+    // alrededor para no volver a pedirlos -- pero multiplica los que se
+    // piden A LA VEZ, y el cargador del WebView, que admite pocas
+    // peticiones simultaneas, empieza a descartarlas. El resultado eran
+    // los huecos. Con 1 se pide poco mas de lo que se ve.
+    keepBuffer: 1,
+    // Esperar a que el desplazamiento termine antes de pedir: evita
+    // encargar mosaicos de posiciones intermedias que ya no se veran.
+    updateWhenIdle: true,
+    updateWhenZooming: false,
+    // SIN crossOrigin. Cuando la pagina se carga desde el JAR el origen
+    // es "null", y marcar las imagenes como cross-origin obliga a una
+    // comprobacion CORS que el servidor de mosaicos no satisface: la
+    // imagen se descarga y aun asi se descarta. Sin el atributo, se
+    // pintan como cualquier <img> de toda la vida.
+    attribution: '&copy; colaboradores de <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  });
+
+  capaMosaicos.on("tileerror", function (evento) {
+    var img = evento.tile;
+    if (!img) { return; }
+    var intentos = parseInt(img.dataset.intentos || "0", 10);
+    if (intentos >= 2) { return; }
+    img.dataset.intentos = String(intentos + 1);
+    var url = evento.target.getTileUrl(evento.coords);
+    // Se espacian los reintentos (1 s, 2 s): si el cargador del WebView
+    // esta saturado, insistir de inmediato solo lo satura mas.
+    setTimeout(function () {
+      img.src = url + (url.indexOf("?") < 0 ? "?" : "&") + "r=" + Date.now();
+    }, 1000 * (intentos + 1));
+  });
+
+  capaMosaicos.addTo(mapa);
+
+  var capaRuta = null;      // la ruta planificada, tenue
+  var capaEstela = null;    // lo ya recorrido, marcado
+  var marcadorVehiculo = null;
+  var marcadorOrigen = null;
+  var marcadorDestino = null;
+  var estadosConocidos = [];
+  var seguir = true;
+
+  function iconoVehiculo(entregado) {
+    return L.divIcon({
+      className: "",
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
+      html: '<div class="vehiculo' + (entregado ? " entregado" : "") + '">' +
+              '<div class="disco">' +
+                '<svg viewBox="0 0 24 24"><path d="M3 13l2-5h9l3 3h3a1 1 0 011 1v3h-2a2 2 0 11-4 0H9a2 2 0 11-4 0H3v-2z"/></svg>' +
+              '</div></div>'
+    });
+  }
+
+  function iconoPin(emoji) {
+    return L.divIcon({ className: "", iconSize: [24, 24], iconAnchor: [12, 22],
+                       html: '<div class="pin">' + emoji + '</div>' });
+  }
+
+  function texto(id, valor) {
+    var nodo = document.getElementById(id);
+    if (nodo) { nodo.textContent = valor; }
+  }
+
+  function metros(valor) {
+    if (valor == null) { return "—"; }
+    return valor >= 1000 ? (valor / 1000).toFixed(1) + " km" : Math.round(valor) + " m";
+  }
+
+  function duracion(segundos) {
+    if (segundos == null) { return "—"; }
+    if (segundos <= 0) { return "ya llegó"; }
+    var m = Math.floor(segundos / 60), s = Math.round(segundos % 60);
+    return m > 0 ? m + " min " + s + " s" : s + " s";
+  }
+
+  function pintarPasos(estadoActual) {
+    var lista = document.getElementById("pasos");
+    lista.innerHTML = "";
+    var indiceActual = estadosConocidos.indexOf(estadoActual);
+    estadosConocidos.forEach(function (nombre, i) {
+      var li = document.createElement("li");
+      li.textContent = nombre;
+      if (i < indiceActual) { li.className = "hecho"; }
+      if (i === indiceActual) { li.className = "actual"; }
+      lista.appendChild(li);
+    });
+  }
+
+  function moverVehiculo(lat, lon, rumbo, entregado) {
+    var punto = [lat, lon];
+    if (!marcadorVehiculo) {
+      marcadorVehiculo = L.marker(punto, { icon: iconoVehiculo(entregado), zIndexOffset: 1000 })
+                          .addTo(mapa);
+    } else {
+      marcadorVehiculo.setLatLng(punto);
+      marcadorVehiculo.setIcon(iconoVehiculo(entregado));
+    }
+    var nodo = marcadorVehiculo.getElement();
+    if (nodo) {
+      var disco = nodo.querySelector(".disco");
+      if (disco && rumbo != null) { disco.style.setProperty("--rot", rumbo + "deg"); }
+    }
+    if (seguir && fueraDelCentro(punto)) {
+      mapa.panTo(punto, { animate: true, duration: .8 });
+    }
+  }
+
+  /*
+   * Verdadero si el punto esta saliendose de la zona central de la
+   * vista. Desplazar el mapa solo entonces reduce las peticiones de
+   * mosaicos de una por segundo a unas pocas por minuto, que es lo que
+   * quita los huecos. Ademas se ve mejor: el mapa deja de temblar.
+   */
+  function fueraDelCentro(punto) {
+    var limites = mapa.getBounds();
+    var margen = 0.22;   // 22 % por cada lado
+    var altoLat = limites.getNorth() - limites.getSouth();
+    var anchoLon = limites.getEast() - limites.getWest();
+    var centro = L.latLngBounds(
+      [limites.getSouth() + altoLat * margen, limites.getWest() + anchoLon * margen],
+      [limites.getNorth() - altoLat * margen, limites.getEast() - anchoLon * margen]);
+    return !centro.contains(L.latLng(punto[0], punto[1]));
+  }
+
+  window.LIB = {
+
+    /** Primer mensaje: dibuja la ruta entera y coloca el vehiculo. */
+    snapshot: function (datos) {
+      estadosConocidos = datos.states || [];
+      texto("codigo", datos.code || "");
+      texto("titulo", datos.status || "");
+      texto("destino", datos.destination || "—");
+
+      if (capaRuta) { mapa.removeLayer(capaRuta); }
+      if (capaEstela) { mapa.removeLayer(capaEstela); }
+      if (marcadorOrigen) { mapa.removeLayer(marcadorOrigen); }
+      if (marcadorDestino) { mapa.removeLayer(marcadorDestino); }
+
+      var ruta = datos.route || [];
+      if (ruta.length > 1) {
+        capaRuta = L.polyline(ruta, { color: "#94a3b8", weight: 4, opacity: .45 }).addTo(mapa);
+        marcadorOrigen = L.marker(ruta[0], { icon: iconoPin("📦") })
+                          .addTo(mapa).bindTooltip("Almacén: " + (datos.origin || ""));
+        marcadorDestino = L.marker(ruta[ruta.length - 1], { icon: iconoPin("🏁") })
+                           .addTo(mapa).bindTooltip("Destino: " + (datos.destination || ""));
+        mapa.fitBounds(capaRuta.getBounds(), { padding: [60, 60] });
+      }
+
+      capaEstela = L.polyline(datos.trail || [], { color: "#38bdf8", weight: 5 }).addTo(mapa);
+      moverVehiculo(datos.lat, datos.lon, datos.heading, datos.status === "Entregado");
+
+      document.getElementById("progreso").style.width = ((datos.progress || 0) * 100) + "%";
+      texto("restante", metros(datos.totalMeters));
+      texto("eta", duracion(datos.etaSeconds));
+      pintarPasos(datos.status);
+    },
+
+    /** Cada tick: mueve el vehiculo y alarga la estela. */
+    posicion: function (datos) {
+      var entregado = datos.status === "Entregado";
+      moverVehiculo(datos.lat, datos.lon, datos.heading, entregado);
+      if (capaEstela) { capaEstela.addLatLng([datos.lat, datos.lon]); }
+
+      document.getElementById("progreso").style.width = ((datos.progress || 0) * 100) + "%";
+      texto("titulo", datos.status || "");
+      texto("restante", metros(datos.remainingMeters));
+      texto("eta", duracion(datos.etaSeconds));
+      pintarPasos(datos.status);
+    },
+
+    /** Solo cuando cambia el estado. */
+    estado: function (datos) {
+      texto("titulo", datos.status || "");
+      pintarPasos(datos.status);
+      if (datos.status === "Entregado" && marcadorVehiculo) {
+        marcadorVehiculo.setIcon(iconoVehiculo(true));
+        if (capaRuta) { mapa.fitBounds(capaRuta.getBounds(), { padding: [60, 60] }); }
+      }
+    },
+
+    /** Un fallo que merece verse en el mapa y no solo en un dialogo. */
+    error: function (mensaje) {
+      texto("titulo", "No se pudo rastrear");
+      texto("codigo", "error");
+      texto("destino", mensaje || "");
+    },
+
+    /** Que el mapa deje de perseguir al vehiculo (el usuario arrastro). */
+    seguir: function (activo) { seguir = !!activo; },
+
+    /** Leaflet necesita saber que cambio el tamano del WebView. */
+    redimensionar: function () { mapa.invalidateSize(); }
+  };
+
+  // Si alguien arrastra el mapa, deja de seguir al vehiculo: perseguirlo
+  // mientras intentas mirar otra cosa es de las cosas mas molestas que
+  // puede hacer un mapa.
+  mapa.on("dragstart", function () { seguir = false; });
+
+  window.addEventListener("resize", function () { mapa.invalidateSize(); });
+})();
+</script>
+</body>
+</html>

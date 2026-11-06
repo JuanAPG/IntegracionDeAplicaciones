@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  apps/JavaDesktop_app/maven-settings.xml
+
+  POR QUE EXISTE ESTE ARCHIVO
+  El ~/.m2/settings.xml de este equipo redefine el repositorio `central`
+  para que apunte a un Artifactory interno (artifactory.oci.oraclecorp.com)
+  que no es accesible desde fuera de esa red. Con esa configuracion, Maven
+  ni siquiera puede descargar sus propios plugins y el build falla con
+  "nodename nor servname provided".
+
+  Este archivo NO modifica la configuracion global: se pasa con la opcion
+  -s y solo afecta a este proyecto. Lo unico que hace es devolver `central`
+  a Maven Central. Si en tu equipo Maven ya resuelve contra Central, puedes
+  compilar sin el: `mvn clean javafx:run` a secas.
+
+      mvn -s maven-settings.xml clean javafx:run
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+  <profiles>
+    <profile>
+      <id>maven-central</id>
+      <repositories>
+        <repository>
+          <id>central</id>
+          <url>https://repo1.maven.org/maven2</url>
+          <releases><enabled>true</enabled></releases>
+          <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>central</id>
+          <url>https://repo1.maven.org/maven2</url>
+          <releases><enabled>true</enabled></releases>
+          <snapshots><enabled>false</enabled></snapshots>
+        </pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+  <activeProfiles>
+    <activeProfile>maven-central</activeProfile>
+  </activeProfiles>
+</settings>

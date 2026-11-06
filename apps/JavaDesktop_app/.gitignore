@@ -1,0 +1,13 @@
+# Artefactos de compilacion de Maven
+target/
+
+# Configuracion local del usuario (IP de la VM, preferencias).
+# NUNCA se versiona: ver config.properties.example
+config.properties
+
+# Secreto compartido del JWT y URL de pedidos. NUNCA se versiona.
+tracking_server/.env
+
+# Entorno virtual del servidor de rastreo
+tracking_server/.venv/
+tracking_server/__pycache__/
