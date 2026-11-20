@@ -13,7 +13,8 @@ Proyecto de integración de aplicaciones con monolito, clientes de escritorio, s
 | Código Python compartido | `packages/library_common/` |
 | Esquema, migraciones y datos | `data/` y `db/` |
 | Nginx y guía de clientes | `docs/nginx/` |
-| Evidencia de integración local | `evidencias/reverse-proxy/` |
+| Captura de integración local | `evidencias/reverse-proxy/` |
+| Scripts y registro de la prueba local | `scripts/reverse-proxy/` |
 
 Los seis clientes de servicios de las aplicaciones de escritorio admiten el gateway. Antes de ejecutarlos, configurar el origen real como se explica en `docs/nginx/CLIENTES.md`; los valores guardados previamente pueden seguir apuntando a puertos directos. Cada aplicación y servicio tiene instrucciones y dependencias en su propia carpeta.
 

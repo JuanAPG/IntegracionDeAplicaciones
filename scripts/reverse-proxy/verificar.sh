@@ -19,7 +19,7 @@ PY
 docker run -d --rm --name "$container" -p 127.0.0.1:18081:8080 -v "$work/mock.conf:/etc/nginx/conf.d/default.conf:ro" nginx:stable-alpine >/dev/null
 docker exec "$container" nginx -t
 cd "$root"
-python3 evidencias/reverse-proxy/prueba_gateway.py
-node evidencias/reverse-proxy/prueba_gateway.js
+python3 scripts/reverse-proxy/prueba_gateway.py
+node scripts/reverse-proxy/prueba_gateway.js
 mvn -q -f apps/JavaDesktop_app/pom.xml compile dependency:build-classpath -Dmdep.outputFile="$work/classpath.txt"
-java -cp "apps/JavaDesktop_app/target/classes:$(cat "$work/classpath.txt")" evidencias/reverse-proxy/PruebaGateway.java
+java -cp "apps/JavaDesktop_app/target/classes:$(cat "$work/classpath.txt")" scripts/reverse-proxy/PruebaGateway.java
