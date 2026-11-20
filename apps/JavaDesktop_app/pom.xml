@@ -37,7 +37,7 @@
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <javafx.version>25.0.5</javafx.version>
+    <javafx.version>21.0.8</javafx.version>
     <jackson.version>2.18.2</jackson.version>
     <main.class>mx.udem.library.desktop.App</main.class>
   </properties>

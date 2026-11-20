@@ -14,6 +14,8 @@ El token y el refresh se guardan en un TokenBox compartido con los demas
 clientes (ver api_client.py), para que renovar en un sitio valga para
 todos.
 """
+from gateway_url import service_url
+
 import json
 import secrets
 
@@ -152,6 +154,8 @@ class LoginClient:
             data = r.json() if "json" in r.headers.get("Content-Type", "") else {}
         except Exception:
             data = {}
+        if r.status_code == 403 and "/api/" in self.base_url:
+            return False, "Salud restringida por el gateway; estado desconocido.", {"degraded": True}
         if r.status_code == 200:
             return True, "up", data
         msg, _, _ = _err(r, "Login no disponible")
@@ -228,7 +232,7 @@ class LoginClient:
 
     def login(self, email, password):
         try:
-            r = self.session.post(f"{self.base_url}/login", params={"format": "json"},
+            r = self.session.post(service_url(self.base_url, "/login"), params={"format": "json"},
                                   json={"email": email, "password": password},
                                   timeout=self.timeout)
         except requests.RequestException as exc:

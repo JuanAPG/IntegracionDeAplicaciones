@@ -73,6 +73,8 @@ class BooksClient(ApiClient):
             data = r.json() if "json" in r.headers.get("Content-Type", "") else {}
         except Exception:
             data = {}
+        if r.status_code == 403 and "/api/" in self.base_url:
+            return False, "Salud restringida por el gateway; estado desconocido.", {"degraded": True}
         if r.status_code == 200:
             # Con Redis caído, books responde 200 con status "degraded":
             # el catálogo se lee, pero las escrituras darán 503. El

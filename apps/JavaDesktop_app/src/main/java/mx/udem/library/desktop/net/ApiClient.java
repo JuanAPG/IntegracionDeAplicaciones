@@ -188,7 +188,18 @@ public final class ApiClient {
         parametros.putIfAbsent(servicio.formatParam(), "json");
 
         StringBuilder url = new StringBuilder(config.base(servicio).toString());
-        url.append(ruta.startsWith("/") ? ruta : "/" + ruta);
+        String rutaNormalizada = ruta.startsWith("/") ? ruta : "/" + ruta;
+        String prefijo = "/" + servicio.id();
+        String basePath = config.base(servicio).getPath();
+        if (basePath != null && basePath.replaceAll("/+$", "").endsWith("/api" + prefijo)
+                && (rutaNormalizada.equals(prefijo) || rutaNormalizada.startsWith(prefijo + "/")
+                    || rutaNormalizada.startsWith(prefijo + "?"))) {
+            rutaNormalizada = rutaNormalizada.substring(prefijo.length());
+        }
+        while (url.length() > 0 && url.charAt(url.length() - 1) == '/') {
+            url.setLength(url.length() - 1);
+        }
+        url.append(rutaNormalizada);
 
         boolean primero = true;
         for (Map.Entry<String, String> par : parametros.entrySet()) {

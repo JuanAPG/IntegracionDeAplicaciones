@@ -19,6 +19,8 @@ QUE RESUELVE
 Todos los servicios piden JSON explicitamente: ?output=json para libros
 (donde ?format= es un filtro de busqueda) y ?format=json para los demas.
 """
+from gateway_url import service_url
+
 import base64
 import json
 import time
@@ -190,7 +192,7 @@ class ApiClient:
         """
         if auth:
             self._renew_if_needed()
-        url = f"{self.base_url}{path}"
+        url = service_url(self.base_url, path)
         try:
             response = self.session.request(
                 method, url, params=self._params(params), json=json_body,
@@ -265,6 +267,8 @@ class ApiClient:
                                    fallback=f"{self.SERVICE} no disponible")
         if ok:
             return True, "up", data
+        if error.status == 403 and "/api/" in self.base_url:
+            return False, "Salud restringida por el gateway; estado desconocido.", {"degraded": True}
         # Un 503 CON cuerpo significa accesible pero degradado: es
         # amarillo, no rojo, y el semaforo necesita distinguirlo.
         if error.status == 503 and error.details:

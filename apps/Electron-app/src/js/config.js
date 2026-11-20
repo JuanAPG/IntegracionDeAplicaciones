@@ -16,7 +16,7 @@ const LibraryConfig = (() => {
   // servicios restantes se derivan de la misma IP cambiando el puerto,
   // y se pueden sobreescribir uno a uno.
   const DEFAULTS = Object.freeze({
-    baseUrl: 'http://34.51.14.158:5001',
+    baseUrl: 'http://34.51.14.158/api/books',
     endpoint: '/books',
     pageSize: 6,
     loginUrl: '',
@@ -78,11 +78,25 @@ const LibraryConfig = (() => {
     if (!puerto) return normalizado.baseUrl;
     try {
       const url = new URL(normalizado.baseUrl);
+      if (url.pathname.replace(/\/+$/, '').endsWith('/api/books')) {
+        return url.origin + url.pathname.replace(/\/books\/?$/, '/' + nombre);
+      }
       url.port = String(puerto);
       return url.origin;
     } catch {
       return normalizado.baseUrl;
     }
+  }
+
+  function requestUrl(base, path) {
+    const match = new URL(base).pathname.match(/\/api\/(login|books|users|authors|pedidos|pagos)\/?$/);
+    if (match) {
+      const prefix = '/' + match[1];
+      if (path === prefix || path.startsWith(prefix + '/') || path.startsWith(prefix + '?')) {
+        path = path.slice(prefix.length);
+      }
+    }
+    return base.replace(/\/+$/, '') + path;
   }
 
   /** Las seis URL base, resueltas. */
@@ -131,12 +145,12 @@ const LibraryConfig = (() => {
    */
   function buildUrl(config, { limit, offset } = {}) {
     const { baseUrl, endpoint } = normalize(config);
-    const url = new URL(baseUrl + endpoint);
+    const url = new URL(requestUrl(baseUrl, endpoint));
     if (Number.isFinite(limit)) url.searchParams.set('limit', String(limit));
     if (Number.isFinite(offset)) url.searchParams.set('offset', String(offset));
     return url.toString();
   }
 
   return { DEFAULTS, PAGE_SIZES, PUERTOS, STORAGE_KEY, load, save, reset,
-           normalize, buildUrl, serviceUrl, serviceUrls };
+           normalize, buildUrl, serviceUrl, serviceUrls, requestUrl };
 })();

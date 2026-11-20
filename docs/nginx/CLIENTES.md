@@ -1,0 +1,11 @@
+# Conexión de las aplicaciones al reverse proxy
+
+Los clientes de Electron, PythonTK y Java construyen las rutas del gateway de `library.conf`. Por ejemplo, con `https://biblioteca.example` como origen: `/api/login`, `/api/books`, `/api/users`, `/api/authors`, `/api/pedidos` y `/api/pagos`. Se conservan rutas especiales como `/api/users/roles`, `/api/pedidos/envios/<numero>` y `/api/pagos/pedidos/<id>/saldo`. Las bases configuradas directamente a un puerto siguen siendo válidas para pruebas locales.
+
+Las IP incluidas en los valores por defecto proceden del proyecto y pueden estar desactualizadas. Sustituirlas por el origen real del servidor y asegurarse de que coincide con `server_name` en Nginx. HTTPS requiere configurar antes TLS y certificados; la plantilla incluida es HTTP. No asumir que el puerto 3000 del monolito está activo sin comprobar la VM.
+
+- **PythonTK:** en Ajustes escribir el origen, por ejemplo `https://biblioteca.example`, y usar «Aplicar a los seis», luego guardar. Los campos quedan con `/api/<servicio>`. Las configuraciones ya guardadas no se sustituyen automáticamente.
+- **Electron:** configurar URL base `https://biblioteca.example/api/books` y endpoint `/books`. Dejar las otras URL de servicio vacías para derivarlas del mismo origen; si existen URL guardadas, borrarlas o cambiar cada una a `/api/<servicio>`. Si se usan bases de puertos directos, se mantiene la derivación anterior.
+- **Java:** en Ajustes escribir el origen completo, incluido `https://` si corresponde. Se rellenan las seis bases con `/api/<servicio>`. La URL del servidor independiente de rastreo en tiempo real se conserva. `LIBRARY_VM_IP` también acepta un origen completo. Las preferencias previas en `~/.library-desktop/config.properties` siguen prevaleciendo salvo que se use la variable de entorno o se modifiquen en Ajustes.
+
+La plantilla restringe `/api/<servicio>/health` a la propia VM. Un 403 de estas rutas se presenta como estado desconocido/restringido en vez de afirmar que el servicio está caído. La conectividad real debe comprobarse con endpoints funcionales y credenciales de prueba apropiadas. Los mecanismos JWT y las reglas de los servicios no se han cambiado. Instalar y validar la configuración solo después de inspeccionar la VM, siguiendo `README.md` de esta carpeta.

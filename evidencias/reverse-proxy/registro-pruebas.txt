@@ -1,0 +1,21 @@
+LIBRARY - PRUEBAS DE INTEGRACION LOCAL CON NGINX
+Los microservicios responden con simuladores; no es la VM.
+
+PythonTK: login y refresh -> rutas públicas correctas
+PythonTK: /books/15 -> :5001/books/15?output=json OK
+PythonTK: /roles -> :5002/roles?format=json OK
+PythonTK: /authors/3/books -> :5003/authors/3/books?format=json OK
+PythonTK: /envios/ABC -> :5004/envios/ABC?format=json OK
+PythonTK: /pedidos/15/saldo -> :5005/pedidos/15/saldo?format=json OK
+Electron: catálogo y login -> rutas públicas correctas
+Electron: envíos -> :5004/envios/ABC OK
+Electron: métodos -> :5005/metodos OK
+Electron: saldo -> :5005/pedidos/15/saldo OK
+Java: /login -> :5000/login?format=json OK
+Java: /books/15 -> :5001/books/15?output=json OK
+Java: /roles -> :5002/roles?format=json OK
+Java: /authors/3/books -> :5003/authors/3/books?format=json OK
+Java: /envios/ABC -> :5004/envios/ABC?format=json OK
+Java: /pedidos/15/saldo -> :5005/pedidos/15/saldo?format=json OK
+
+Resultado: comprobaciones de las tres aplicaciones completadas.

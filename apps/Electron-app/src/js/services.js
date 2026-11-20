@@ -24,7 +24,7 @@ const LibraryServices = (() => {
                                 anonymous = false, parse }) {
     const base = urls(config)[service];
     const response = await LibraryAuth.request(urls(config).login, {
-      url: `${base}${path}`,
+      url: LibraryConfig.requestUrl(base, path),
       method,
       body,
       anonymous,
@@ -155,6 +155,9 @@ const LibraryServices = (() => {
     const result = await call(config, {
       service, path: '/health', anonymous: true, parse: LibraryXml.parseHealth,
     });
+    if (!result.ok && result.status === 403 && urls(config)[service].includes('/api/')) {
+      return { service, state: 'degraded', detail: 'Salud restringida por el gateway; estado desconocido.' };
+    }
     if (!result.ok) return { service, state: 'down', detail: result.message };
     const data = result.data || {};
     const degradado = data.status !== 'ok'

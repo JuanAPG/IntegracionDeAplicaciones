@@ -11,12 +11,12 @@ VM_POR_OMISION = "34.51.14.158"
 
 DEFAULTS = {
     "endpoints": {
-        "login_base_url": f"http://{VM_POR_OMISION}:5000",
-        "books_base_url": f"http://{VM_POR_OMISION}:5001",
-        "users_base_url": f"http://{VM_POR_OMISION}:5002",
-        "authors_base_url": f"http://{VM_POR_OMISION}:5003",
-        "pedidos_base_url": f"http://{VM_POR_OMISION}:5004",
-        "pagos_base_url": f"http://{VM_POR_OMISION}:5005",
+        "login_base_url": f"http://{VM_POR_OMISION}/api/login",
+        "books_base_url": f"http://{VM_POR_OMISION}/api/books",
+        "users_base_url": f"http://{VM_POR_OMISION}/api/users",
+        "authors_base_url": f"http://{VM_POR_OMISION}/api/authors",
+        "pedidos_base_url": f"http://{VM_POR_OMISION}/api/pedidos",
+        "pagos_base_url": f"http://{VM_POR_OMISION}/api/pagos",
         "timeout": 8,
         "poll": 15,
     },
@@ -160,7 +160,7 @@ def timings(config):
 
 def set_vm_host(config, host):
     """
-    Apunta los SEIS servicios a una IP, conservando los puertos.
+    Apunta los seis servicios al origen del gateway.
 
     La IP de la VM es efímera y cambia a menudo: esto evita tener que
     editar seis campos a mano cada vez.
@@ -174,5 +174,5 @@ def set_vm_host(config, host):
                "authors": 5003, "pedidos": 5004, "pagos": 5005}
     ep = config.setdefault("endpoints", {})
     for nombre, puerto in puertos.items():
-        ep[f"{nombre}_base_url"] = f"{host}:{puerto}"
+        ep[f"{nombre}_base_url"] = f"{host}/api/{nombre}"
     return save(config)

@@ -125,7 +125,7 @@ El token aparece en los argumentos de curl mientras corre: usar una cuenta de pr
 - `apps/services/escritorio/Ejercicio1.py` y `auth_client.py`: cliente adicional de Login y URL SOAP configurable; revisar si se usan en el despliegue.
 - `apps/web_monolito`: usa PostgreSQL directamente (`src/config/database.js`); no se encontraron llamadas a estas seis APIs en `src`. Confirmar configuración de despliegue y consumidores externos antes de concluir que no requiere migración.
 
-No basta cambiar todas las bases a `/api/<servicio>`: por ejemplo, añadir `/books` a `/api/books` duplica el nombre; Login igualmente duplica `/login`. Ajustar la construcción de cada ruta, incluyendo salud, `/roles`, `/envios`, `/metodos` y el saldo de Pagos. Actualizar URLs guardadas y probar sesión, renovación de token y CORS. No se modifica código de clientes en esta entrega.
+No basta cambiar todas las bases a `/api/<servicio>`: por ejemplo, añadir `/books` a `/api/books` duplica el nombre; Login igualmente duplica `/login`. Ajustar la construcción de cada ruta, incluyendo salud, `/roles`, `/envios`, `/metodos` y el saldo de Pagos. Actualizar URLs guardadas y probar sesión, renovación de token y CORS. Las aplicaciones ya incluyen soporte para estas rutas; ver `CLIENTES.md` para actualizar ajustes persistidos y validar el despliegue.
 
 ## Seguridad
 

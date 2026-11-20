@@ -98,7 +98,7 @@ const LibraryAuth = (() => {
   /* --- operaciones ---------------------------------------------------- */
   async function login(baseUrl, email, password) {
     const response = await window.libraryBridge.request({
-      url: `${baseUrl}/login?format=json`,
+      url: LibraryConfig.requestUrl(baseUrl, "/login?format=json"),
       method: 'POST',
       accept: 'json',
       body: { email, password },

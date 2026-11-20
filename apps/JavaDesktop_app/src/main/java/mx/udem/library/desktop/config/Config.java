@@ -16,7 +16,7 @@ import java.util.Properties;
  *
  * LA IP DE LA INSTANCIA ES EFIMERA: cambia cada vez que se reinicia la
  * maquina de GCP. Por eso existe {@link #applyHost(String)}: se escribe
- * la IP UNA vez y los siete destinos se reapuntan conservando su puerto.
+ * el origen UNA vez y los seis destinos utilizan el gateway.
  * Los dos clientes que ya existen en el monorepo (el de Tkinter y el de
  * Electron) tienen ese mismo atajo, y por la misma razon.
  *
@@ -93,7 +93,7 @@ public final class Config {
     }
 
     /**
-     * Reapunta los siete destinos a una IP nueva conservando los puertos.
+     * Reapunta los seis servicios al gateway, conservando rastreo.
      * Es la operacion que mas se usa, porque la IP de GCP cambia sola.
      */
     public void applyHost(String host) {
@@ -116,7 +116,9 @@ public final class Config {
             if (servicio == Service.TRACKING) {
                 continue;
             }
-            bases.put(servicio, URI.create("http://" + host + ":" + servicio.defaultPort()));
+            String gateway = host.contains("://") ? host : "http://" + host;
+            gateway = gateway.replaceAll("/+$", "");
+            bases.put(servicio, URI.create(gateway + "/api/" + servicio.id()));
         }
         bases.putIfAbsent(Service.TRACKING, hostDeRastreoPorOmision());
     }

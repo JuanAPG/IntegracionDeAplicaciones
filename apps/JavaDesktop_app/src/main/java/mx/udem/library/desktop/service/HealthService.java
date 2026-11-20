@@ -56,6 +56,10 @@ public final class HealthService {
             return new Resultado(servicio, Estado.DEGRADADO, "Estado: " + estadoServicio);
 
         } catch (ApiException exc) {
+            if (exc.status() == 403 && config.base(servicio).getPath().contains("/api/")) {
+                return new Resultado(servicio, Estado.DEGRADADO,
+                        "Salud restringida por el gateway; estado desconocido.");
+            }
             // Un 503 CON cuerpo es un servicio vivo pero degradado; un
             // 503 sin cuerpo, o un fallo de red, es un servicio caido.
             if (exc.status() == 503 && !exc.getMessage().isBlank()) {

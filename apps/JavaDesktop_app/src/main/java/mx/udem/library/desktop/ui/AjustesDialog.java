@@ -30,16 +30,16 @@ public final class AjustesDialog extends Dialog<Boolean> {
 
         TextField campoIp = new TextField();
         campoIp.setPromptText("por ejemplo 34.51.65.207");
-        campoIp.setText(contexto.config().base(Service.BOOKS).getHost());
+        campoIp.setText(contexto.config().base(Service.BOOKS).getScheme() + "://" + contexto.config().base(Service.BOOKS).getAuthority());
 
         GridPane rejilla = new GridPane();
         rejilla.setHgap(10);
         rejilla.setVgap(8);
         rejilla.setPadding(new Insets(14));
 
-        rejilla.add(new Label("IP de la instancia:"), 0, 0);
+        rejilla.add(new Label("URL del gateway:"), 0, 0);
         rejilla.add(campoIp, 1, 0);
-        rejilla.add(new Label("Aplica a los siete puertos."), 1, 1);
+        rejilla.add(new Label("Aplica a los seis servicios; rastreo conserva su URL."), 1, 1);
 
         TextField[] campos = new TextField[Service.values().length];
         int fila = 2;
@@ -57,8 +57,10 @@ public final class AjustesDialog extends Dialog<Boolean> {
                 return;
             }
             for (Service servicio : Service.values()) {
-                campos[servicio.ordinal()].setText(
-                        "http://" + ahora.trim() + ":" + servicio.defaultPort());
+                if (servicio != Service.TRACKING) {
+                    String gateway = ahora.trim().contains("://") ? ahora.trim() : "http://" + ahora.trim();
+                    campos[servicio.ordinal()].setText(gateway.replaceAll("/+$", "") + "/api/" + servicio.id());
+                }
             }
         });
 

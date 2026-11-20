@@ -66,7 +66,7 @@
   /* --- Indicador de conexion ---------------------------------------- */
   /** Muestra en el encabezado el origen que se esta consultando. */
   function showOrigin() {
-    const origin = state.config.baseUrl + state.config.endpoint;
+    const origin = LibraryConfig.requestUrl(state.config.baseUrl, state.config.endpoint);
     dom.serviceOrigin.textContent = origin;
     dom.serviceOrigin.title = origin;
   }

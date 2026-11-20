@@ -198,9 +198,8 @@ class SettingsDialog(tk.Toplevel):
     Modificar, probar, guardar y restaurar los endpoints de los SEIS
     microservicios.
 
-    Como la IP de la VM es efímera y cambia a menudo, arriba hay un
-    atajo: escribir la IP una vez rellena los seis campos conservando
-    los puertos (5000..5005). Editar cada URL a mano sigue siendo
+    Como la URL del gateway es efímera y cambia a menudo, arriba hay un
+    atajo: escribir la URL del gateway rellena los seis campos. Editar cada URL a mano sigue siendo
     posible, para un despliegue repartido entre máquinas.
     """
 
@@ -232,7 +231,7 @@ class SettingsDialog(tk.Toplevel):
         # Atajo: una IP para los seis.
         atajo = ttk.Frame(f)
         atajo.pack(fill="x", pady=(0, 10))
-        ttk.Label(atajo, text="IP de la VM").pack(side="left")
+        ttk.Label(atajo, text="URL del gateway").pack(side="left")
         self.e_host = ttk.Entry(atajo, width=18)
         self.e_host.pack(side="left", padx=(6, 6))
         ttk.Button(atajo, text="Aplicar a los seis",
@@ -242,7 +241,7 @@ class SettingsDialog(tk.Toplevel):
         urls = self._store.service_urls(config)
         self.entries = {}
         for clave, etiqueta, puerto in self.PUERTOS:
-            self.entries[clave] = self._row(f, f"{etiqueta} (:{puerto})",
+            self.entries[clave] = self._row(f, f"{etiqueta} (gateway)",
                                             urls.get(clave, ""))
         self.e_timeout = self._row(f, "Timeout segundos", str(ep.get("timeout", 8)))
         self.e_poll = self._row(f, "Chequeo semáforo cada (seg)",
@@ -277,9 +276,9 @@ class SettingsDialog(tk.Toplevel):
         for clave, _etiqueta, puerto in self.PUERTOS:
             entrada = self.entries[clave]
             entrada.delete(0, "end")
-            entrada.insert(0, f"{host}:{puerto}")
+            entrada.insert(0, f"{host}/api/{clave}")
         self.lbl_test.configure(
-            text="Los seis campos apuntan a esa IP (sin guardar aún).")
+            text="Los seis campos apuntan al gateway (sin guardar aún).")
 
     def _draft(self):
         try:

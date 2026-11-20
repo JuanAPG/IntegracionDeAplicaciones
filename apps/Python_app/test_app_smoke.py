@@ -159,8 +159,8 @@ cfg = config_store._deep_merge(config_store.DEFAULTS, {})
 urls = config_store.service_urls(cfg)
 check("hay seis servicios", len(urls) == 6 and set(urls) == set(config_store.SERVICIOS),
       str(sorted(urls)))
-check("los puertos son los esperados",
-      urls["login"].endswith(":5000") and urls["pagos"].endswith(":5005"),
+check("las bases usan el gateway",
+      all(urls[n].endswith("/api/" + n) for n in config_store.SERVICIOS),
       str(urls))
 cfg_copia = json.loads(json.dumps(cfg))
 puertos = {}
